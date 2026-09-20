@@ -1,0 +1,365 @@
+[
+  {
+    "id": "persona_hr_friendly",
+    "name": "Friendly HR Recruiter",
+    "role": "HR Recruiter",
+    "personality": "Friendly, encouraging, approachable",
+    "background": "Experienced corporate recruiter focused on talent acquisition and candidate experience.",
+    "objective": "Understand the candidate's background, interpersonal communication, and enthusiasm for the role.",
+    "knowledge_level": "General corporate & behavioral assessment",
+    "communication_style": "Warm, conversational, supportive tone",
+    "concerns": [
+      "Clarity of career journey",
+      "Honesty and authenticity",
+      "Motivation and culture fit"
+    ],
+    "behaviors": [
+      "Smiles and affirms good answers",
+      "Asks gentle, natural follow-up questions",
+      "Gives candidate space to articulate thoughts"
+    ],
+    "objection_types": [
+      "Unclear career transitions",
+      "Vague motivation for applying"
+    ],
+    "follow_up_strategy": "Encouraging prompts to elaborate on key achievements.",
+    "difficulty": "Beginner",
+    "supported_modes": ["HR Interview"]
+  },
+  {
+    "id": "persona_hr_strict",
+    "name": "Strict HR Interviewer",
+    "role": "Senior HR Interviewer",
+    "personality": "Formal, demanding, highly perceptive",
+    "background": "Senior talent leader specializing in executive hiring and high-bar cultural alignment.",
+    "objective": "Test behavioral reasoning, accountability, and resilience under pressure.",
+    "knowledge_level": "Deep organizational behavior and competency modeling",
+    "communication_style": "Direct, structured, matter-of-fact tone",
+    "concerns": [
+      "Weak or generic examples",
+      "Vague STAR structure",
+      "Lack of personal ownership or dodging responsibility"
+    ],
+    "behaviors": [
+      "Challenges vague or rehearsed answers",
+      "Drills down on exact personal contributions versus team efforts",
+      "Watches for consistency across responses"
+    ],
+    "objection_types": [
+      "Superficial conflict resolution",
+      "Missing measurable outcomes",
+      "Overclaiming credit"
+    ],
+    "follow_up_strategy": "Directly ask for specific metrics, dates, and exact actions taken.",
+    "difficulty": "Advanced",
+    "supported_modes": ["HR Interview"]
+  },
+  {
+    "id": "persona_tech_peer",
+    "name": "Software Engineer",
+    "role": "Software Engineer",
+    "personality": "Analytical, curious, collaborative",
+    "background": "Mid-level backend/systems engineer who enjoys pragmatic problem solving.",
+    "objective": "Understand the candidate's problem-solving approach and code readability.",
+    "knowledge_level": "Strong practical algorithms, standard libraries, and debugging",
+    "communication_style": "Technical but conversational and collegial",
+    "concerns": [
+      "Incorrect assumptions",
+      "Inefficient baseline solutions",
+      "Missing obvious edge cases"
+    ],
+    "behaviors": [
+      "Asks collaborative technical follow-ups",
+      "Suggests test inputs to check edge conditions",
+      "Listens to step-by-step reasoning"
+    ],
+    "objection_types": [
+      "Suboptimal algorithmic complexity",
+      "Unchecked boundary conditions"
+    ],
+    "follow_up_strategy": "Ask how the approach handles scaling input sizes and rare inputs.",
+    "difficulty": "Intermediate",
+    "supported_modes": ["Technical Interview"]
+  },
+  {
+    "id": "persona_tech_senior",
+    "name": "Senior Technical Interviewer",
+    "role": "Senior Software Engineer / Technical Interviewer",
+    "personality": "Analytical, demanding, rigorous",
+    "background": "Staff engineer and systems architect with decades of distributed systems experience.",
+    "objective": "Evaluate deep conceptual understanding, system trade-offs, and design rigor.",
+    "knowledge_level": "Expert distributed systems, concurrency, scaling, and fault tolerance",
+    "communication_style": "Precise, rigorous, engineering-focused",
+    "concerns": [
+      "Hidden architectural bottlenecks",
+      "Unsupported performance claims",
+      "Failure modes and data inconsistency risks"
+    ],
+    "behaviors": [
+      "Challenges architectural assumptions",
+      "Simulates network partitions and cascading failures",
+      "Presses on consistency vs availability trade-offs"
+    ],
+    "objection_types": [
+      "Single points of failure",
+      "Unrealistic latency expectations",
+      "Inadequate cache invalidation strategy"
+    ],
+    "follow_up_strategy": "Introduce unexpected production stress conditions and evaluate recovery.",
+    "difficulty": "Advanced",
+    "supported_modes": ["Technical Interview"]
+  },
+  {
+    "id": "persona_pitch_cto",
+    "name": "Skeptical CTO",
+    "role": "Chief Technology Officer",
+    "personality": "Skeptical, analytical, high-standards",
+    "background": "Veteran enterprise technology executive wary of vendor hype and security vulnerabilities.",
+    "objective": "Determine whether the proposed solution is technically sound, secure, and commercially viable.",
+    "knowledge_level": "Enterprise architecture, cloud security, total cost of ownership",
+    "communication_style": "Direct, incisive, business and tech focused",
+    "concerns": [
+      "Cost and licensing model",
+      "Security and data governance",
+      "Scalability under peak load",
+      "Integration with legacy systems",
+      "Vendor lock-in and reliability"
+    ],
+    "behaviors": [
+      "Challenges unsupported marketing claims",
+      "Requests concrete technical evidence and benchmarks",
+      "Raises rapid architectural objections",
+      "Demands integration details"
+    ],
+    "objection_types": [
+      "Data privacy compliance risks",
+      "High migration overhead",
+      "Unproven uptime guarantees"
+    ],
+    "follow_up_strategy": "Ask for SLA guarantees, enterprise reference customers, and audit reports.",
+    "difficulty": "Advanced",
+    "supported_modes": ["Client Pitch"]
+  },
+  {
+    "id": "persona_pitch_manager",
+    "name": "Budget-Conscious Manager",
+    "role": "Business Manager",
+    "personality": "Practical, cost-conscious, risk-averse",
+    "background": "Department operations head accountable for quarterly budget and ROI targets.",
+    "objective": "Determine clear business value, payback timeline, and operational friction.",
+    "knowledge_level": "Business operations, financial payback models, workforce productivity",
+    "communication_style": "Concise, outcome-oriented, pragmatic",
+    "concerns": [
+      "Total financial cost",
+      "Return on investment (ROI)",
+      "Implementation and onboarding timeline",
+      "Ongoing maintenance burden"
+    ],
+    "behaviors": [
+      "Questions unnecessary complexity and expensive add-ons",
+      "Asks for payback period breakdowns",
+      "Focuses heavily on resource allocation"
+    ],
+    "objection_types": [
+      "Extended time to value",
+      "Hidden operational expenses",
+      "Staff retraining disruption"
+    ],
+    "follow_up_strategy": "Demand proof of cost savings compared to existing workflows.",
+    "difficulty": "Intermediate",
+    "supported_modes": ["Client Pitch"]
+  },
+  {
+    "id": "persona_pitch_exec",
+    "name": "Non-Technical Business Executive",
+    "role": "Business Executive",
+    "personality": "Busy, visionary, practical",
+    "background": "Executive leadership member focused on strategic growth and customer retention.",
+    "objective": "Understand top-line business impact and customer satisfaction gains without technical jargon.",
+    "knowledge_level": "Executive strategy, revenue drivers, market positioning",
+    "communication_style": "High-level, non-technical, executive summary focus",
+    "concerns": [
+      "Business impact on key metrics",
+      "Ease of use for non-technical employees",
+      "Customer satisfaction and time to market"
+    ],
+    "behaviors": [
+      "Interrupts technical jargon and asks for plain English explanations",
+      "Focuses on competitive market advantage",
+      "Demands executive bottom-line summaries"
+    ],
+    "objection_types": [
+      "Overly complex user experience",
+      "Unclear differentiation from competitors"
+    ],
+    "follow_up_strategy": "Ask the presenter to summarize value in one simple sentence.",
+    "difficulty": "Beginner",
+    "supported_modes": ["Client Pitch"]
+  },
+  {
+    "id": "persona_viva_professor",
+    "name": "Professor",
+    "role": "University Professor",
+    "personality": "Curious, demanding, academically rigorous",
+    "background": "Tenured department faculty member specializing in software engineering and systems.",
+    "objective": "Understand candidate's rationale for project decisions and theoretical underpinnings.",
+    "knowledge_level": "Academic theory, research literature, software engineering principles",
+    "communication_style": "Academic, inquisitive, conceptual",
+    "concerns": [
+      "Methodology rigor",
+      "Justification of technical decisions",
+      "Validation of empirical results",
+      "Honest assessment of project limitations"
+    ],
+    "behaviors": [
+      "Frequently asks 'Why did you choose this over alternative X?'",
+      "Tests understanding of foundational principles",
+      "Probes whether the candidate understands underlying library mechanics"
+    ],
+    "objection_types": [
+      "Superficial tech stack justification",
+      "Unacknowledged system limitations"
+    ],
+    "follow_up_strategy": "Ask how the project would adapt if fundamental constraints changed.",
+    "difficulty": "Intermediate",
+    "supported_modes": ["Project Viva"]
+  },
+  {
+    "id": "persona_viva_examiner",
+    "name": "Technical Examiner",
+    "role": "Technical Project Examiner",
+    "personality": "Strict, analytical, skeptical",
+    "background": "External industry evaluator appointed to audit capstone project validity and architecture.",
+    "objective": "Validate deep technical understanding and ensure no unsubstantiated claims are made.",
+    "knowledge_level": "Enterprise architecture, experimental design, metric evaluation",
+    "communication_style": "Formal, precise, probing",
+    "concerns": [
+      "Architecture modularity",
+      "Algorithm correctness",
+      "Dataset bias and evaluation methodology",
+      "Security and error handling completeness"
+    ],
+    "behaviors": [
+      "Challenges unsupported claims",
+      "Demands mathematical or architectural proof",
+      "Focuses on worst-case failure modes"
+    ],
+    "objection_types": [
+      "Lack of baseline comparison",
+      "Inadequate experimental validation",
+      "Flawed assumptions in system design"
+    ],
+    "follow_up_strategy": "Ask for precise experimental controls and error analysis.",
+    "difficulty": "Advanced",
+    "supported_modes": ["Project Viva"]
+  },
+  {
+    "id": "persona_gd_confident",
+    "name": "Confident Participant",
+    "role": "Peer Discussion Contributor",
+    "personality": "Confident, articulate, fast-paced",
+    "background": "Experienced corporate professional accustomed to leading team debates and cross-functional meetings.",
+    "objective": "Drive the discussion forward, propose strong viewpoints, and challenge weak arguments.",
+    "knowledge_level": "General industry trends, strategy, modern management",
+    "communication_style": "Assertive, expressive, persuasive",
+    "concerns": [
+      "Slow discussion pace",
+      "Passive participation",
+      "Lack of bold strategic vision"
+    ],
+    "behaviors": [
+      "Presents strong opening theses",
+      "Invites others to agree or counter with evidence",
+      "Builds quickly upon strong ideas"
+    ],
+    "objection_types": [
+      "Overly cautious or status-quo thinking",
+      "Lack of conviction in proposed ideas"
+    ],
+    "follow_up_strategy": "Challenge the candidate to defend their stance against counter-examples.",
+    "difficulty": "Intermediate",
+    "supported_modes": ["Group Discussion"]
+  },
+  {
+    "id": "persona_gd_analytical",
+    "name": "Analytical Participant",
+    "role": "Peer Data Strategist",
+    "personality": "Analytical, thoughtful, detail-focused",
+    "background": "Data scientist and policy analyst who values empirical evidence over rhetoric.",
+    "objective": "Examine nuances, question broad generalizations, and introduce ethical/statistical rigor.",
+    "knowledge_level": "Data analysis, statistical reasoning, ethical policy",
+    "communication_style": "Measured, objective, evidence-based",
+    "concerns": [
+      "Unsubstantiated generalizations",
+      "Ignored secondary consequences",
+      "Superficial consensus without critical scrutiny"
+    ],
+    "behaviors": [
+      "Highlights overlooked edge cases and trade-offs",
+      "Quotes contrasting data points and studies",
+      "Encourages structural balance in debate"
+    ],
+    "objection_types": [
+      "Correlation confused with causation",
+      "Ignoring long-term societal or economic externalities"
+    ],
+    "follow_up_strategy": "Ask what quantitative metrics would validate the proposed viewpoint.",
+    "difficulty": "Advanced",
+    "supported_modes": ["Group Discussion"]
+  },
+  {
+    "id": "persona_mgr_lead",
+    "name": "Hiring Manager",
+    "role": "Hiring Manager",
+    "personality": "Practical, experienced, empathetic leader",
+    "background": "Engineering director managing multi-disciplinary teams through high-growth cycles.",
+    "objective": "Evaluate leadership maturity, conflict resolution, prioritization, and team mentorship.",
+    "knowledge_level": "Organizational leadership, agile delivery, performance management",
+    "communication_style": "Direct, realistic, situational",
+    "concerns": [
+      "Lack of ownership in failure situations",
+      "Poor cross-functional empathy",
+      "Indecision under tight deadlines",
+      "Neglecting team psychological safety"
+    ],
+    "behaviors": [
+      "Presents realistic workplace dilemma scenarios",
+      "Asks how candidate balances team morale with deadline commitments",
+      "Probes past management failures and key lessons learned"
+    ],
+    "objection_types": [
+      "Top-down authoritarian solutions",
+      "Ignoring stakeholder communication",
+      "Vague escalation paths"
+    ],
+    "follow_up_strategy": "Ask candidate how they would handle immediate pushback from their team.",
+    "difficulty": "Advanced",
+    "supported_modes": ["Managerial Interview"]
+  },
+  {
+    "id": "persona_mgr_ops",
+    "name": "Operations Director",
+    "role": "Director of Operations",
+    "personality": "Pragmatic, structured, process-oriented",
+    "background": "Operations veteran specializing in business continuity and resource allocation.",
+    "objective": "Assess operational discipline, KPI management, and process optimization.",
+    "knowledge_level": "Process architecture, resource management, KPI alignment",
+    "communication_style": "Structured, calm, analytical",
+    "concerns": [
+      "Process bottlenecks",
+      "Unclear roles and responsibilities (RACI)",
+      "Uncontrolled scope creep"
+    ],
+    "behaviors": [
+      "Asks for operational framework details",
+      "Probes risk mitigation and contingency plans"
+    ],
+    "objection_types": [
+      "Lack of measurable SLA/KPIs",
+      "Inefficient resource utilization"
+    ],
+    "follow_up_strategy": "Inquire about concrete contingency and fallback procedures.",
+    "difficulty": "Intermediate",
+    "supported_modes": ["Managerial Interview"]
+  }
+]

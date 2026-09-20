@@ -1,0 +1,301 @@
+[
+  {
+    "id": "hr_intro_01",
+    "name": "Tell Me About Yourself",
+    "mode": "HR Interview",
+    "difficulty": "Beginner",
+    "persona_id": "persona_hr_friendly",
+    "persona": "Friendly HR Recruiter",
+    "description": "The AI interviewer asks the candidate to introduce themselves, outline their career journey, and highlight key strengths.",
+    "conversation_goal": "Deliver a concise, engaging 2-minute elevator pitch connecting past experience to future career aspirations.",
+    "objective": "Deliver a concise, engaging 2-minute elevator pitch connecting past experience to future career aspirations.",
+    "expected_topics": [
+      "Background summary",
+      "Key technical/leadership accomplishments",
+      "Motivation for this role"
+    ],
+    "forbidden_topics": [
+      "Overly personal non-professional details",
+      "Negative comments about previous employers"
+    ],
+    "opening_message": "Welcome! Thank you for taking the time to speak with us today. To get started, could you tell me a little bit about yourself and your background?",
+    "max_turns": 5,
+    "maximum_turns": 5
+  },
+  {
+    "id": "hr_behavioral_02",
+    "name": "Overcoming Workplace Adversity",
+    "mode": "HR Interview",
+    "difficulty": "Intermediate",
+    "persona_id": "persona_hr_strict",
+    "persona": "Strict HR Interviewer",
+    "description": "Demonstrate conflict resolution, resilience, and adaptability using the STAR method.",
+    "conversation_goal": "Articulate a specific challenge at work, actions taken, and measurable outcomes.",
+    "objective": "Articulate a specific challenge at work, actions taken, and measurable outcomes.",
+    "expected_topics": [
+      "STAR framework",
+      "Conflict resolution",
+      "Emotional intelligence"
+    ],
+    "forbidden_topics": [
+      "Blaming colleagues without taking personal ownership",
+      "Vague hypothetical scenarios without concrete past examples"
+    ],
+    "opening_message": "Can you describe a time when you faced a significant hurdle or disagreement at work, and how you worked through it?",
+    "max_turns": 5,
+    "maximum_turns": 5
+  },
+  {
+    "id": "tech_python_01",
+    "name": "Python Problem Solving",
+    "mode": "Technical Interview",
+    "difficulty": "Intermediate",
+    "persona_id": "persona_tech_peer",
+    "persona": "Software Engineer",
+    "description": "The interviewer evaluates how the candidate explains their approach to algorithmic problem-solving and clean Python code design.",
+    "conversation_goal": "Explain thought process, time/space complexity trade-offs, and edge case handling clearly.",
+    "objective": "Explain thought process, time/space complexity trade-offs, and edge case handling clearly.",
+    "expected_topics": [
+      "Data structures & algorithms",
+      "Time/space complexity analysis",
+      "Python idiomatic patterns & clean code"
+    ],
+    "forbidden_topics": [
+      "Writing brute force code without analyzing complexity",
+      "Ignoring memory constraints and stream edge cases"
+    ],
+    "opening_message": "Let's work through a problem. Suppose you need to process a continuous stream of numerical transactions and find the rolling top-K elements in real-time. How would you design this?",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "tech_system_design_02",
+    "name": "Distributed Cache Architecture",
+    "mode": "Technical Interview",
+    "difficulty": "Advanced",
+    "persona_id": "persona_tech_senior",
+    "persona": "Senior Technical Interviewer",
+    "description": "Discuss high-availability system architecture, cache invalidation strategies, and latency trade-offs.",
+    "conversation_goal": "Design a scalable distributed caching layer handling millions of requests per second.",
+    "objective": "Design a scalable distributed caching layer handling millions of requests per second.",
+    "expected_topics": [
+      "Consistency vs availability",
+      "Eviction policies",
+      "Fault tolerance and partitioning"
+    ],
+    "forbidden_topics": [
+      "Assuming zero network latency or 100% network reliability",
+      "Neglecting cache stampede and thundering herd mitigation"
+    ],
+    "opening_message": "Let's design a distributed in-memory cache system for a global e-commerce platform. What are your key architectural components and consistency guarantees?",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "pitch_ai_solution_01",
+    "name": "AI Solution Pitch",
+    "mode": "Client Pitch",
+    "difficulty": "Advanced",
+    "persona_id": "persona_pitch_cto",
+    "persona": "Skeptical CTO",
+    "description": "The candidate presents an enterprise AI automation solution to an executive decision-maker.",
+    "conversation_goal": "Communicate business value, ROI, deployment safety, and competitive differentiation.",
+    "objective": "Communicate business value, ROI, deployment safety, and competitive differentiation.",
+    "expected_topics": [
+      "Value proposition & ROI",
+      "Security & compliance",
+      "Implementation roadmap"
+    ],
+    "forbidden_topics": [
+      "Buzzword overload without technical depth",
+      "Overpromising 100% accuracy on non-deterministic AI models"
+    ],
+    "opening_message": "Thanks for joining our executive briefing. We are considering modernizing our customer workflows. What makes your AI solution the right fit for our enterprise?",
+    "max_turns": 5,
+    "maximum_turns": 5
+  },
+  {
+    "id": "pitch_startup_seed_02",
+    "name": "Seed Round Investor Pitch",
+    "mode": "Client Pitch",
+    "difficulty": "Intermediate",
+    "persona_id": "persona_pitch_manager",
+    "persona": "Budget-Conscious Manager",
+    "description": "Pitch a high-growth tech startup to angel and seed-stage venture capital investors.",
+    "conversation_goal": "Articulate market size, defensible moat, unit economics, and growth metrics convincingly.",
+    "objective": "Articulate market size, defensible moat, unit economics, and growth metrics convincingly.",
+    "expected_topics": [
+      "Market opportunity (TAM/SAM)",
+      "Traction & unit economics",
+      "Competitive moat"
+    ],
+    "forbidden_topics": [
+      "Unrealistic hockey-stick projections without CAC/LTV validation",
+      "Dismissing existing market incumbents"
+    ],
+    "opening_message": "We have reviewed your deck briefly. Give us your 3-minute pitch on why this is a venture-scale opportunity and why your team will win.",
+    "max_turns": 5,
+    "maximum_turns": 5
+  },
+  {
+    "id": "pitch_exec_briefing_03",
+    "name": "Executive Product Briefing",
+    "mode": "Client Pitch",
+    "difficulty": "Beginner",
+    "persona_id": "persona_pitch_exec",
+    "persona": "Non-Technical Business Executive",
+    "description": "Present high-level business software benefits to executive leadership in clear, jargon-free language.",
+    "conversation_goal": "Explain strategic revenue impact and user adoption in simple, compelling terms.",
+    "objective": "Explain strategic revenue impact and user adoption in simple, compelling terms.",
+    "expected_topics": [
+      "Business impact",
+      "Ease of user adoption",
+      "Customer satisfaction metrics"
+    ],
+    "forbidden_topics": [
+      "Deep technical jargon and esoteric framework names",
+      "Overly granular code architecture details"
+    ],
+    "opening_message": "I only have a few minutes between meetings. In plain English, how will your product help our business grow this quarter?",
+    "max_turns": 5,
+    "maximum_turns": 5
+  },
+  {
+    "id": "viva_arch_01",
+    "name": "Project Architecture Explanation",
+    "mode": "Project Viva",
+    "difficulty": "Intermediate",
+    "persona_id": "persona_viva_professor",
+    "persona": "Professor",
+    "description": "The candidate explains the architecture, design choices, and technical decisions behind a completed project.",
+    "conversation_goal": "Defend technology stack choices, database schema design, and modularity principles.",
+    "objective": "Defend technology stack choices, database schema design, and modularity principles.",
+    "expected_topics": [
+      "System architecture diagram",
+      "Tech stack justification",
+      "Trade-offs and limitations"
+    ],
+    "forbidden_topics": [
+      "Saying 'I picked it because it was popular' without engineering rationale",
+      "Concealing known system bugs or design limitations"
+    ],
+    "opening_message": "Please present the high-level architecture of your capstone project and explain why you chose this specific tech stack over alternatives.",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "viva_research_02",
+    "name": "Methodology & Validation Defense",
+    "mode": "Project Viva",
+    "difficulty": "Advanced",
+    "persona_id": "persona_viva_examiner",
+    "persona": "Technical Examiner",
+    "description": "Defend experimental methodology, dataset selection, evaluation metrics, and error analysis in academic research.",
+    "conversation_goal": "Critically analyze validation rigor, baseline comparisons, and generalizability of results.",
+    "objective": "Critically analyze validation rigor, baseline comparisons, and generalizability of results.",
+    "expected_topics": [
+      "Experimental rigor",
+      "Statistical significance",
+      "Threats to validity"
+    ],
+    "forbidden_topics": [
+      "Claiming results are flawless without error analysis",
+      "Evaluating models solely on train datasets"
+    ],
+    "opening_message": "Let's look at your evaluation methodology. How did you ensure baseline comparability, and what steps were taken to prevent dataset leakage?",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "gd_ai_workplace_01",
+    "name": "AI in the Workplace",
+    "mode": "Group Discussion",
+    "difficulty": "Intermediate",
+    "persona_id": "persona_gd_confident",
+    "persona": "Confident Participant",
+    "description": "The candidate participates in a structured discussion about the ethical and productivity impacts of AI on workplaces.",
+    "conversation_goal": "Contribute balanced viewpoints, listen actively, and build constructively on others' arguments.",
+    "objective": "Contribute balanced viewpoints, listen actively, and build constructively on others' arguments.",
+    "expected_topics": [
+      "Workforce transformation",
+      "Ethics and accountability",
+      "Human-in-the-loop collaboration"
+    ],
+    "forbidden_topics": [
+      "Interrupting aggressively or talking over other participants",
+      "Taking extreme dogmatic stances without acknowledging counterpoints"
+    ],
+    "opening_message": "The topic for today's discussion is 'Artificial Intelligence in the Modern Workplace: Threat or Opportunity?'. Who would like to open the discussion?",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "gd_remote_work_02",
+    "name": "Future of Remote vs Hybrid Culture",
+    "mode": "Group Discussion",
+    "difficulty": "Advanced",
+    "persona_id": "persona_gd_analytical",
+    "persona": "Analytical Participant",
+    "description": "Engage in a collaborative debate on workplace autonomy, team cohesion, and async communication norms.",
+    "conversation_goal": "Present clear, data-informed arguments while facilitating group consensus.",
+    "objective": "Present clear, data-informed arguments while facilitating group consensus.",
+    "expected_topics": [
+      "Productivity measurement",
+      "Company culture & onboarding",
+      "Global talent access"
+    ],
+    "forbidden_topics": [
+      "Using anecdotal evidence as universal truth",
+      "Ignoring employee mental health and burnout nuances"
+    ],
+    "opening_message": "Welcome everyone. Today we are debating whether fully remote work models hinder innovation compared to hybrid setups. Please share your perspective.",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "mgr_team_situation_01",
+    "name": "Handling a Difficult Team Situation",
+    "mode": "Managerial Interview",
+    "difficulty": "Advanced",
+    "persona_id": "persona_mgr_lead",
+    "persona": "Hiring Manager",
+    "description": "The candidate explains how they would handle a challenging team situation involving mismatched expectations and tight deadlines.",
+    "conversation_goal": "Demonstrate empathetic leadership, accountability, conflict mediation, and decisive action under pressure.",
+    "objective": "Demonstrate empathetic leadership, accountability, conflict mediation, and decisive action under pressure.",
+    "expected_topics": [
+      "Empathetic communication",
+      "Performance turnaround plan",
+      "Stakeholder management"
+    ],
+    "forbidden_topics": [
+      "Publicly shaming underperforming employees",
+      "Hiding bad news from leadership stakeholders"
+    ],
+    "opening_message": "Imagine two senior engineers on your team strongly disagree on an architectural decision, causing a two-week sprint delay. How would you step in and resolve this?",
+    "max_turns": 6,
+    "maximum_turns": 6
+  },
+  {
+    "id": "mgr_stakeholder_02",
+    "name": "Managing Competing Executive Priorities",
+    "mode": "Managerial Interview",
+    "difficulty": "Intermediate",
+    "persona_id": "persona_mgr_ops",
+    "persona": "Operations Director",
+    "description": "Navigate conflicting roadmap requests from Product, Sales, and Engineering with transparent trade-offs.",
+    "conversation_goal": "Demonstrate prioritization frameworks, transparent expectation-setting, and diplomatic negotiation.",
+    "objective": "Demonstrate prioritization frameworks, transparent expectation-setting, and diplomatic negotiation.",
+    "expected_topics": [
+      "Prioritization frameworks (e.g. RICE)",
+      "Cross-functional alignment",
+      "Saying no with rationale"
+    ],
+    "forbidden_topics": [
+      "Saying 'yes' to all stakeholders resulting in team overcommitment and failure",
+      "Making arbitrary decisions without data or framework"
+    ],
+    "opening_message": "Sales has committed a custom feature to close a major deal, while Engineering needs the sprint to remediate critical tech debt. How do you handle this priority clash?",
+    "max_turns": 6,
+    "maximum_turns": 6
+  }
+]
