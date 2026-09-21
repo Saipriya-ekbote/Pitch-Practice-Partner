@@ -20,7 +20,7 @@ Traditional interview and communication prep tools suffer from major limitations
 * **Static Question Lists:** Reading lists of FAQs does not test real-time conversational adaptability.
 * **Lack of Dynamic Follow-ups:** Real interviewers probe deeper based on what candidates actually say.
 * **One-Way Monologues:** Speaking to a mirror or a basic timer lacks conversational tension, active listening, and audience context.
-* **No Actionable Feedback:** General advice rarely pinpoints filler words, clarity gaps, structural issues, or missed objectives.
+* **Vague Scores Without Guidance:** Telling a candidate they scored "72/100" without explaining what happened, why it matters, or what to do next provides little practical value.
 
 ---
 
@@ -31,61 +31,79 @@ Traditional interview and communication prep tools suffer from major limitations
 2. **Context-Aware Dynamic Follow-ups:** Experience dynamic back-and-forth dialogue tailored to your actual responses, the chosen scenario, and difficulty.
 3. **Structured Scenario & Persona Library:** Scenarios across HR interviews, technical coding/system design, investor pitches, academic vivas, team discussions, and managerial leadership.
 4. **Conversation Intelligence (Phase 4):** Pure evidence-based extraction of linguistic features, question responses, topical coverage, and persona concerns.
-5. **Explainable Evaluation & Scoring Engine (Phase 5):** Deterministic, evidence-backed multi-dimensional scoring (0–100 scale) with explainable rationales and normalized overall scores.
+5. **Evaluation & Scoring Engine (Phase 5):** Deterministic, evidence-backed multi-dimensional scoring (0–100 scale) with normalized overall scores.
+6. **Explainable Feedback Engine (Phase 6):** Evidence-backed **WHAT / WHY / EVIDENCE / IMPACT / ACTION** feedback framework providing concrete, prioritized practice steps.
 
 ---
 
 ## 🚀 Current Phase
 
-**Phase 5 — Evaluation & Scoring Engine**
+**Phase 6 — Explainable Feedback Engine**
 
 > [!NOTE]
-> The application evaluates completed role-play sessions using deterministic scoring rules and domain-specific rubrics mapped directly to extracted conversation evidence. Every score is fully explainable with explicit factual evidence and rationales.
+> Phase 6 transforms Phase 4 conversation evidence and Phase 5 evaluation scores into clear, evidence-grounded, actionable feedback. Instead of opaque grades, users receive transparent explanations of **WHAT** was observed, **WHY** it affected evaluation, verbatim or factual **EVIDENCE**, domain-specific **IMPACT**, and concrete **ACTIONS** for their next practice session.
 
 ---
 
-## 📊 Evaluation & Scoring Architecture (Phase 5)
+## 💡 Explainable Feedback Architecture (Phase 6)
 
-`	ext
-                     Completed Practice Session Transcript
-                                      │
-                                      ▼
-                        ConversationAnalyzer (Phase 4)
-                          [Structured Evidence Object]
-                                      │
-                                      ▼
-                         EvaluationEngine (Phase 5)
-                                      │
-      ┌───────────────────────────────┴───────────────────────────────┐
-      ▼                                                               ▼
-Standard Shared Dimensions                               Mode-Specific Evaluators
-- Question Handling (addressed/partial/unaddressed)     - HR: STAR completeness & concrete metrics
-- Topic Coverage (expected scenario topics)             - Tech: Complexity rigor & edge case reasoning
-- Communication & Fluency (fillers/repetition/length)   - Pitch: Value prop, ROI, security & objections
-- Relevance & Substance (substantive turns)             - Viva: Architecture defense & limitations
-- Objection Handling (pushback evidence)               - GD: Argument nuance & collaborative synthesis
-                                                        - Managerial: 1-on-1 coaching & prioritization
-                                      │
-                                      ▼
-                     Normalized Overall Score (0–100)
-            + Evidence-Backed Strengths & Improvement Areas
-            + Insufficient Evidence & Applicability Badges
-`
+```text
+                  Completed Practice Session Transcript
+                                    │
+                                    ▼
+                      ConversationAnalyzer (Phase 4)
+                       [Structured Evidence Object]
+                                    │
+                                    ▼
+                       EvaluationEngine (Phase 5)
+                      [Dimensional Scores & Status]
+                                    │
+                                    ▼
+                        FeedbackEngine (Phase 6)
+                                    │
+    ┌───────────────────────────────┴───────────────────────────────┐
+    ▼                                                               ▼
+WHAT / WHY / EVIDENCE / IMPACT / ACTION              Prioritized Practice Guidance
+- WHAT: Factual conversation observation            - High / Medium / Low priority mapping
+- WHY: Why the observation influenced score         - Top priority actions for next session
+- EVIDENCE: Verbatim quote or factual metric        - Evidence-backed strengths
+- IMPACT: Real-world significance in mode/domain    - Actionable key improvement areas
+- ACTION: Concrete step-by-step technique           - Insufficient evidence guidance
+```
 
-### 🎯 Standardized Scoring Methodology (0–100 Scale)
+### 🔍 The WHAT / WHY / EVIDENCE / IMPACT / ACTION Framework
 
-| Score Dimension | Evaluation Focus | Deterministic Scoring Logic |
+Every evaluated communication dimension is decomposed into an explainable 5-part model:
+
+| Element | Purpose | Example |
 | :--- | :--- | :--- |
-| **Question Handling** | Responsiveness to AI inquiries | (Addressed * 1.0 + Partially * 0.5) / Total Questions * 100 |
-| **Topic Coverage** | Alignment with scenario goals | (Covered Topics / Total Expected Topics) * 100 |
-| **Communication & Fluency** | Language delivery & pacing | 100 - Filler Penalty - Repetition Penalty - Brevity Penalty |
-| **Relevance & Substance** | Content depth & consistency | 70 + (Substantive Turn Ratio * 30) - Contradiction Penalties |
-| **Objection Handling** | Addressing persona pushback | (Addressed Objections / Total Raised Objections) * 100 |
-| **Domain Dimensions** | Mode-specific competencies | STAR framework (HR), Complexity (Tech), ROI/Security (Pitch), etc. |
+| **WHAT** | What was observed in the candidate's conversation? | *"You addressed most questions, but one follow-up question remained only partially answered."* |
+| **WHY** | Why did this observation affect evaluation? | *"The response discussed the broader topic but did not provide the specific implementation detail requested."* |
+| **EVIDENCE** | What verifiable transcript evidence supports this? | `[Transcript excerpt — Turn 2]: "We used AWS services to handle the load."`<br>*(or `[Analysis observation]: Time complexity analysis: Detected; Space/memory overhead analysis: Detected`)* |
+| **IMPACT** | Why does this matter in the selected scenario? | *"In technical interviews, missing requested implementation details makes it harder for interviewers to verify depth."* |
+| **ACTION** | What concrete thing should the user do next time? | *"When asked a follow-up, answer the exact question in your opening sentence before elaborating with context."* |
 
-> [!TIP]
-> **Evidence-Grounded Normalization**: If a session lacks questions, objections, or speech data, dimensions are labeled as insufficient_evidence or 
-ot_applicable. The overall score dynamically normalizes only across evaluated dimensions, ensuring the user is never penalized with arbitrary zeros for conditions not encountered in the conversation.
+---
+
+## 🛡️ Real Evidence & Language Safety Guarantees
+
+* **Real Evidence Only:** The engine strictly utilizes verbatim transcript excerpts from user turns or clearly labeled analysis observations (e.g., `[Transcript excerpt — Turn 1]` or `[Analysis observation]`). It **never fabricates or hallucinates dialogue**.
+* **Objective Language Signals Only:** Feedback strictly avoids unsupported psychological or personality diagnoses (such as *"you are nervous"*, *"you lack confidence"*, or *"you have anxiety"*). It references observable linguistic indicators only (e.g. *"language-based confidence indicator: filler words detected (4.2% of speech)"*).
+* **Deterministic & Zero-API Dependency:** Like earlier phases, Phase 6 feedback generation is 100% deterministic and runs locally in Demo Mode without requiring an LLM API key.
+* **Non-Penalizing Missing Evidence:** Dimensions with `insufficient_evidence` (e.g. no objection voiced by the persona) are explicitly explained with guidance on how to trigger those conditions, without penalizing the overall score.
+
+---
+
+## 👔 Mode-Specific Feedback Rubrics
+
+| Practice Mode | Evaluated Competencies | Feedback Focus & Guidance |
+| :--- | :--- | :--- |
+| **HR Interview** | STAR framework, metrics, question handling | Situation → Task → Action → Result structure, personal ownership, quantifiable outcomes |
+| **Technical Interview** | Complexity rigor, concept breadth, edge cases | Dual Big-O time and space analysis, boundary conditions, data structure trade-offs |
+| **Client Pitch** | Value proposition, ROI, security, objections | Connecting features to ROI payback, enterprise security compliance, resolving pushback |
+| **Project Viva** | Architecture defense, validation, limitations | Design pattern rationale, empirical baseline benchmarks, candid limitation appraisal |
+| **Group Discussion** | Argument quality, synthesis, debate dynamics | Evidence-backed assertions, multi-perspective nuance, collaborative consensus building |
+| **Managerial Interview** | Empathy, coaching, mediation, prioritization | 1-on-1 coaching frameworks, data-driven conflict resolution, RICE roadmap ownership |
 
 ---
 
@@ -109,25 +127,25 @@ ot_applicable. The overall score dynamically normalizes only across evaluated di
 
 ---
 
-## ✨ Current Features (Phase 1 to Phase 5)
+## ✨ Current Features (Phase 1 to Phase 6)
 
 * **Interactive Multi-Turn Role-Play:** Dynamic back-and-forth simulation with persona-guided follow-ups and turn controls.
 * **Evidence-Based Conversation Intelligence:** On-demand analysis of completed sessions providing factual observations.
-* **Explainable Evaluation & Scoring:** Multi-dimensional scoring on a 0–100 scale backed by explicit evidence quotes and rationales.
-* **Domain-Specific Mode Evaluators:** Customized rubrics across all 6 practice modes (HR, Tech, Pitch, Viva, GD, Managerial).
-* **Evidence-Backed Feedback:** Automatically generated strengths and concrete improvement areas tied directly to conversation data.
-* **Normalized Overall Scoring:** Weighted scoring that gracefully handles unobserved dimensions (insufficient_evidence / 
-ot_applicable).
+* **Transparent Evaluation & Scoring:** Multi-dimensional scoring on a 0–100 scale backed by explicit evidence quotes and rationales.
+* **Explainable Feedback Engine (WHAT / WHY / EVIDENCE / IMPACT / ACTION):** Fully explainable feedback for every evaluated dimension.
+* **Prioritized Practice Actions:** Top actionable guidelines categorized into High, Medium, and Low priority.
+* **Evidence-Backed Strengths & Improvements:** Concrete positive accomplishments and actionable improvement areas tied to transcript evidence.
+* **Domain-Specific Mode Evaluators:** Rubrics across all 6 practice modes (HR, Tech, Pitch, Viva, GD, Managerial).
 * **Zero-Dependency Demo Mode:** 100% deterministic local execution without requiring an LLM API key.
-* **Robust Pytest Suite:** 85 deterministic unit tests passing in < 0.3s.
+* **Comprehensive Pytest Suite:** 110 deterministic unit tests passing in < 0.3s.
 
 ---
 
 ## 🗺️ Planned Features (Future Phases)
 
-* **Phase 6:** Session History & Persistence (Database storage, session review, progress tracking).
-* **Phase 7:** Analytics Dashboard & Longitudinal Performance Trends.
-* **Phase 8:** Real-Time Voice Practice & Speech Evaluation (VAD, pitch, pacing, hesitation detection).
+* **Phase 7:** Session History & Persistence (Database storage, session review, longitudinal progress tracking).
+* **Phase 8:** Analytics Dashboard & Longitudinal Performance Trends.
+* **Phase 9:** Real-Time Voice Practice & Speech Evaluation (VAD, pitch, pacing, hesitation detection).
 
 ---
 
@@ -143,28 +161,28 @@ ot_applicable).
 ## 📦 Installation
 
 ### 1. Clone the Repository
-`ash
+```bash
 git clone https://github.com/your-username/pitch-practice-partner.git
 cd pitch-practice-partner
-`
+```
 
 ### 2. Create and Activate a Virtual Environment
 **On Windows (PowerShell):**
-`powershell
+```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-`
+```
 
 **On macOS / Linux:**
-`ash
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
-`
+```
 
 ### 3. Install Dependencies
-`ash
+```bash
 pip install -r requirements.txt
-`
+```
 
 ---
 
@@ -172,9 +190,9 @@ pip install -r requirements.txt
 
 Launch the Streamlit web application:
 
-`ash
+```bash
 streamlit run app.py
-`
+```
 
 The application will start locally at http://localhost:8501.
 
@@ -184,25 +202,25 @@ The application will start locally at http://localhost:8501.
 
 Execute the automated test suite with pytest:
 
-`ash
+```bash
 python -m pytest -q
-`
+```
 
 To run with verbose output:
 
-`ash
+```bash
 python -m pytest -v
-`
+```
 
 ---
 
 ## 📂 Project Structure
 
-`	ext
+```text
 Pitch-Practice-Partner/
 │
-├── app.py                      # Streamlit application layout, chat UI, analysis & evaluation view
-├── README.md                   # Project documentation updated for Phase 5
+├── app.py                      # Streamlit application layout, chat UI, analysis, evaluation & feedback view
+├── README.md                   # Project documentation updated for Phase 6
 ├── requirements.txt            # Minimal Python dependencies
 ├── .gitignore                  # Git ignore rules for virtualenvs, cache & secrets
 ├── .env.example                # Example environment variables template
@@ -210,12 +228,19 @@ Pitch-Practice-Partner/
 ├── src/                        # Core source code
 │   ├── __init__.py             # Package metadata
 │   │
+│   ├── feedback/               # Explainable Feedback Engine (Phase 6)
+│   │   ├── __init__.py
+│   │   ├── feedback_models.py  # FeedbackItem, StrengthFeedbackItem, ImprovementFeedbackItem, PracticeAction
+│   │   ├── feedback_rules.py   # Mode-specific & dimension rules (WHAT/WHY/EVIDENCE/IMPACT/ACTION)
+│   │   ├── feedback_engine.py  # Central feedback synthesizer & priority classifier
+│   │   └── evidence_utils.py   # Real transcript excerpt extractor & attribution formatter
+│   │
 │   ├── evaluation/             # Evaluation & Scoring Engine (Phase 5)
 │   │   ├── __init__.py
 │   │   ├── evaluation_models.py # ScoreDimension, EvaluationResult, DimensionStatus
 │   │   ├── scoring_rules.py    # Deterministic scoring mathematical formulas
 │   │   ├── mode_evaluators.py  # Evaluators for all 6 practice modes
-│   │   └── evaluation_engine.py # Central evaluator & explainability generator
+│   │   └── evaluation_engine.py # Central evaluator & score normalizer
 │   │
 │   ├── intelligence/           # Conversation Intelligence Engine (Phase 4)
 │   │   ├── __init__.py
@@ -248,8 +273,9 @@ Pitch-Practice-Partner/
 │
 └── tests/                      # Automated unit test suite
     ├── __init__.py
-    └── test_scenarios.py       # Deterministic pytest suite (85 unit tests)
-`
+    ├── test_scenarios.py       # Deterministic pytest suite (85 unit tests for Phases 1-5)
+    └── test_feedback.py        # Comprehensive Phase 6 unit test suite (25 unit tests)
+```
 
 ---
 

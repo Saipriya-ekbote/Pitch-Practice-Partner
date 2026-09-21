@@ -1,6 +1,6 @@
 """
 Pitch Practice Partner — AI Interview & Communication Simulator
-Phase 5: Evaluation & Scoring Engine
+Phase 6: Explainable Feedback Engine
 """
 
 import streamlit as st
@@ -19,6 +19,13 @@ from src.intelligence.conversation_analyzer import ConversationAnalyzer
 from src.intelligence.analysis_models import ConversationAnalysis
 from src.evaluation.evaluation_engine import EvaluationEngine
 from src.evaluation.evaluation_models import EvaluationResult, DimensionStatus
+from src.feedback import (
+    FeedbackEngine,
+    FeedbackResult,
+    FeedbackPriority,
+    EvidenceType,
+    format_evidence_display,
+)
 from src.ai.provider import get_ai_provider
 from src.utils import (
     APP_NAME,
@@ -147,6 +154,54 @@ CUSTOM_CSS = """
         border-radius: 0 6px 6px 0;
         margin-bottom: 8px;
     }
+    .feedback-card {
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 14px;
+    }
+    .action-callout {
+        background-color: rgba(59, 130, 246, 0.08);
+        border-left: 4px solid #3b82f6;
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+        margin-top: 8px;
+        font-size: 0.92rem;
+    }
+    .badge-priority-high {
+        display: inline-block;
+        background-color: rgba(239, 68, 68, 0.15);
+        color: #b91c1c;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .badge-priority-med {
+        display: inline-block;
+        background-color: rgba(245, 158, 11, 0.15);
+        color: #b45309;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .badge-priority-low {
+        display: inline-block;
+        background-color: rgba(16, 185, 129, 0.15);
+        color: #047857;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 </style>
 """
 
@@ -169,6 +224,8 @@ def init_session_state() -> None:
         st.session_state.current_analysis = None
     if "current_evaluation" not in st.session_state:
         st.session_state.current_evaluation = None
+    if "current_feedback" not in st.session_state:
+        st.session_state.current_feedback = None
     if "scenario_manager" not in st.session_state:
         st.session_state.scenario_manager = ScenarioManager()
     if "ai_provider" not in st.session_state:
@@ -181,6 +238,8 @@ def init_session_state() -> None:
         st.session_state.conversation_analyzer = ConversationAnalyzer()
     if "evaluation_engine" not in st.session_state:
         st.session_state.evaluation_engine = EvaluationEngine()
+    if "feedback_engine" not in st.session_state:
+        st.session_state.feedback_engine = FeedbackEngine()
 
 
 def render_sidebar() -> None:
@@ -221,7 +280,7 @@ def render_sidebar() -> None:
 
         st.markdown("---")
         st.caption(f"**Version:** {APP_VERSION}")
-        st.caption(f"**Phase:** Phase 5 — Evaluation & Scoring Engine")
+        st.caption(f"**Phase:** Phase 6 — Explainable Feedback Engine")
 
 
 def render_home_page(scenario_mgr: ScenarioManager) -> None:
@@ -235,8 +294,9 @@ def render_home_page(scenario_mgr: ScenarioManager) -> None:
         f"""
         <div class="banner-demo">
             <strong>ℹ️ Active Engine:</strong> Operating in <strong>{status.name}</strong> mode with 
-            integrated <strong>Evaluation & Scoring Engine (Phase 5)</strong>. Complete realistic role-play 
-            simulations and receive transparent, evidence-backed dimensional scores and performance breakdowns.
+            integrated <strong>Explainable Feedback Engine (Phase 6)</strong>. Complete realistic role-play 
+            simulations and receive transparent, evidence-backed scores, WHAT / WHY / EVIDENCE / IMPACT / ACTION 
+            breakdowns, and prioritized practice guidance.
         </div>
         """,
         unsafe_allow_html=True,
@@ -415,6 +475,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 )
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
+                st.session_state.current_feedback = None
                 st.session_state.is_practicing = True
                 st.rerun()
 
@@ -433,6 +494,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.active_session = None
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
+                st.session_state.current_feedback = None
                 st.rerun()
             return
 
@@ -464,6 +526,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 )
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
+                st.session_state.current_feedback = None
                 st.rerun()
         with ctrl_c2:
             if session.is_active():
@@ -476,6 +539,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.active_session = None
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
+                st.session_state.current_feedback = None
                 st.rerun()
 
         st.markdown("---")
@@ -533,7 +597,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                     st.rerun()
 
             with col_act2:
-                if st.button("🏆 Evaluate Performance & Score (Phase 5)", type="primary", use_container_width=True):
+                if st.button("🏆 Evaluate Performance & Generate Explainable Feedback (Phase 6)", type="primary", use_container_width=True):
                     if st.session_state.current_analysis is None:
                         with st.spinner("Extracting conversation evidence first..."):
                             st.session_state.current_analysis = analyzer.analyze(session, scenario, persona)
@@ -543,24 +607,44 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                             scenario=scenario,
                             persona=persona,
                         )
+                    with st.spinner("Synthesizing explainable feedback (WHAT / WHY / EVIDENCE / IMPACT / ACTION)..."):
+                        st.session_state.current_feedback = st.session_state.feedback_engine.generate_feedback(
+                            analysis=st.session_state.current_analysis,
+                            evaluation=st.session_state.current_evaluation,
+                            session=session,
+                            scenario=scenario,
+                            persona=persona,
+                        )
                     st.rerun()
 
-            # Render Evaluation Result (Phase 5)
+            # Render Evaluation & Feedback Result (Phase 5 & 6)
             if st.session_state.current_evaluation is not None:
-                render_evaluation_report(st.session_state.current_evaluation)
+                if st.session_state.current_feedback is None and st.session_state.current_analysis is not None:
+                    st.session_state.current_feedback = st.session_state.feedback_engine.generate_feedback(
+                        analysis=st.session_state.current_analysis,
+                        evaluation=st.session_state.current_evaluation,
+                        session=session,
+                        scenario=scenario,
+                        persona=persona,
+                    )
+                render_evaluation_report(st.session_state.current_evaluation, st.session_state.current_feedback)
 
             # Render Conversation Analysis (Phase 4)
             if st.session_state.current_analysis is not None and st.session_state.current_evaluation is None:
                 render_conversation_analysis_report(st.session_state.current_analysis)
 
 
-def render_evaluation_report(evaluation: EvaluationResult) -> None:
+def render_evaluation_report(
+    evaluation: EvaluationResult,
+    feedback: Optional[FeedbackResult] = None
+) -> None:
     """
-    Render structured, explainable performance evaluation with overall and dimensional scores.
+    Render structured, explainable performance evaluation with overall scores,
+    dimensional breakdowns, and evidence-backed WHAT / WHY / EVIDENCE / IMPACT / ACTION feedback.
     """
     st.markdown("---")
-    st.markdown("## 🏆 Performance Evaluation Report (Phase 5)")
-    st.caption("Deterministic, evidence-grounded performance assessment across core communication dimensions.")
+    st.markdown("## 🏆 Performance Evaluation & Explainable Feedback Report (Phase 6)")
+    st.caption("Deterministic, evidence-grounded performance assessment with transparent WHAT / WHY / EVIDENCE / IMPACT / ACTION breakdown.")
 
     # 1. Overall Score Hero Card
     st.markdown(
@@ -576,21 +660,102 @@ def render_evaluation_report(evaluation: EvaluationResult) -> None:
     )
     st.progress(min(1.0, max(0.0, evaluation.overall_score / 100.0)))
 
-    # 2. Strengths & Improvement Areas
+    # 2. Executive Feedback Summary (Phase 6)
+    if feedback and feedback.overall_summary:
+        st.markdown(
+            f"""
+            <div class="feedback-card" style="border-left: 4px solid #3b82f6;">
+                <h4 style="margin: 0 0 6px 0; color: #1e40af;">💡 Executive Feedback Summary</h4>
+                <p style="margin: 0; font-size: 0.98rem; line-height: 1.5;">{feedback.overall_summary}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # 3. Priority Practice Actions (Phase 6)
+    if feedback and feedback.priority_actions:
+        st.markdown("### 🎯 Priority Practice Actions for Next Session")
+        st.caption("Key practical adjustments to execute during your next practice turn.")
+        action_cols = st.columns(min(len(feedback.priority_actions), 3))
+        for i, act in enumerate(feedback.priority_actions[:3]):
+            badge_cls = (
+                "badge-priority-high"
+                if act.priority == "High Priority"
+                else ("badge-priority-med" if act.priority == "Medium Priority" else "badge-priority-low")
+            )
+            with action_cols[i % len(action_cols)]:
+                st.markdown(
+                    f"""
+                    <div class="feedback-card" style="height: 100%;">
+                        <span class="{badge_cls}">{act.priority}</span>
+                        <h4 style="margin: 8px 0 6px 0; font-size: 1.05rem;">{act.title}</h4>
+                        <div class="action-callout">
+                            <strong>Guideline:</strong> {act.action}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    # 4. Strengths & Key Improvements (Side-by-side)
     col_str, col_imp = st.columns(2)
     with col_str:
         st.markdown("### 🌟 Evidence-Backed Strengths")
-        for s in evaluation.strengths:
-            st.markdown(f'<div class="strength-item">✓ {s}</div>', unsafe_allow_html=True)
+        if feedback and feedback.strengths:
+            for s in feedback.strengths:
+                s_evi = format_evidence_display(s.evidence, evidence_type=s.evidence_type, source_reference=s.source_reference)
+                st.markdown(
+                    f"""
+                    <div class="strength-item" style="margin-bottom: 12px; padding: 12px 14px;">
+                        <h4 style="margin: 0 0 4px 0; color: #065f46;">✓ {s.title}</h4>
+                        <p style="margin: 0 0 4px 0; font-size: 0.9rem;"><strong>WHAT:</strong> {s.what}</p>
+                        <p style="margin: 0 0 4px 0; font-size: 0.85rem; color: #047857;"><strong>EVIDENCE:</strong> <em>{s_evi}</em></p>
+                        <p style="margin: 0; font-size: 0.85rem; color: #475569;"><strong>IMPACT:</strong> {s.impact}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            for s in evaluation.strengths:
+                st.markdown(f'<div class="strength-item">✓ {s}</div>', unsafe_allow_html=True)
 
     with col_imp:
-        st.markdown("### 📈 Key Improvement Areas")
-        for imp in evaluation.improvement_areas:
-            st.markdown(f'<div class="improve-item">⚡ {imp}</div>', unsafe_allow_html=True)
+        st.markdown("### 📈 Key Actionable Improvement Areas")
+        if feedback and feedback.improvements:
+            for imp in feedback.improvements:
+                badge_cls = (
+                    "badge-priority-high"
+                    if imp.priority == "High Priority"
+                    else ("badge-priority-med" if imp.priority == "Medium Priority" else "badge-priority-low")
+                )
+                imp_evi = format_evidence_display(imp.evidence, evidence_type=imp.evidence_type, source_reference=imp.source_reference)
+                st.markdown(
+                    f"""
+                    <div class="improve-item" style="margin-bottom: 12px; padding: 12px 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <h4 style="margin: 0; color: #92400e;">⚡ {imp.title}</h4>
+                            <span class="{badge_cls}">{imp.priority}</span>
+                        </div>
+                        <p style="margin: 0 0 4px 0; font-size: 0.9rem;"><strong>WHAT:</strong> {imp.what}</p>
+                        <p style="margin: 0 0 4px 0; font-size: 0.85rem; color: #92400e;"><strong>WHY:</strong> {imp.why}</p>
+                        <p style="margin: 0 0 6px 0; font-size: 0.85rem; color: #475569;"><strong>EVIDENCE:</strong> <em>{imp_evi}</em></p>
+                        <div class="action-callout" style="margin-top: 4px; padding: 8px 10px;">
+                            <strong style="color: #1e40af;">ACTION:</strong> {imp.action}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            for imp in evaluation.improvement_areas:
+                st.markdown(f'<div class="improve-item">⚡ {imp}</div>', unsafe_allow_html=True)
 
+    # 5. Detailed Dimension Breakdown & Explainable Feedback
     st.markdown("---")
-    st.markdown("### 📊 Dimension Breakdown & Explainability")
-    st.caption("Each score is derived from factual conversation evidence and transparent scoring rules.")
+    st.markdown("### 📊 Dimension Breakdown & Explainable Feedback")
+    st.caption("Each score connects Phase 5 scoring → Phase 4 factual evidence → WHAT/WHY explanation → Scenario IMPACT → Practical ACTION.")
+
+    feedback_map = {item.dimension: item for item in feedback.items} if feedback else {}
 
     for dim in evaluation.dimensions:
         with st.container():
@@ -612,13 +777,46 @@ def render_evaluation_report(evaluation: EvaluationResult) -> None:
             if dim.is_evaluated():
                 st.progress(min(1.0, max(0.0, dim.score / 100.0)))
 
-            if dim.evidence:
+            item = feedback_map.get(dim.name)
+            if item:
+                badge_cls = (
+                    "badge-priority-high"
+                    if item.priority == "High Priority"
+                    else ("badge-priority-med" if item.priority == "Medium Priority" else "badge-priority-low")
+                )
+                with st.expander(f"💡 Explainable Feedback for {dim.name} ({item.priority})", expanded=False):
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1:
+                        st.markdown(f"**🔍 WHAT was observed:**\n\n{item.what}")
+                        st.markdown(f"**⚖️ WHY it affected evaluation:**\n\n{item.why}")
+                    with col_f2:
+                        st.markdown(f"**🌐 Real-World IMPACT ({evaluation.mode}):**\n\n{item.impact}")
+                        formatted_evi = format_evidence_display(
+                            item.evidence,
+                            evidence_type=item.evidence_type,
+                            source_reference=item.source_reference,
+                        )
+                        st.markdown(f"**📜 EVIDENCE:**\n\n_{formatted_evi}_")
+                    st.markdown(
+                        f"""
+                        <div class="action-callout">
+                            <strong style="color: #1e40af;">🚀 ACTION FOR NEXT SESSION:</strong> {item.action}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            elif dim.evidence:
                 with st.expander(f"🔍 View Evidence Items for {dim.name}", expanded=False):
                     for evi_item in dim.evidence:
                         st.markdown(f"- {evi_item}")
             st.markdown("---")
 
-    if evaluation.insufficient_evidence_dimensions:
+    if feedback and feedback.insufficient_evidence_notes:
+        st.info(
+            "ℹ️ **Competencies Requiring Additional Scenario Evidence:**\n\n"
+            + "\n".join(f"- {note}" for note in feedback.insufficient_evidence_notes)
+        )
+    elif evaluation.insufficient_evidence_dimensions:
         st.info(
             f"ℹ️ **Dimensions with Insufficient Evidence:** {', '.join(evaluation.insufficient_evidence_dimensions)}. "
             "These dimensions require additional conversation turns or specific scenario triggers to be reliably scored."
@@ -823,7 +1021,7 @@ def render_settings_page(ai_provider) -> None:
             - **Application:** `{APP_NAME}`
             - **Subtitle:** `{APP_SUBTITLE}`
             - **Version:** `{APP_VERSION}`
-            - **Current Phase:** `Phase 5 — Evaluation & Scoring Engine`
+            - **Current Phase:** `Phase 6 — Explainable Feedback Engine`
             - **Architecture:** Modular Python / Streamlit
             """
         )
