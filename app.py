@@ -26,6 +26,13 @@ from src.feedback import (
     EvidenceType,
     format_evidence_display,
 )
+from src.history import (
+    HistoryService,
+    AnalyticsService,
+    HistoricalSession,
+    compare_sessions,
+    DEFAULT_DB_PATH,
+)
 from src.ai.provider import get_ai_provider
 from src.utils import (
     APP_NAME,
@@ -240,6 +247,14 @@ def init_session_state() -> None:
         st.session_state.evaluation_engine = EvaluationEngine()
     if "feedback_engine" not in st.session_state:
         st.session_state.feedback_engine = FeedbackEngine()
+    if "history_service" not in st.session_state:
+        st.session_state.history_service = HistoryService()
+    if "analytics_service" not in st.session_state:
+        st.session_state.analytics_service = AnalyticsService(history_service=st.session_state.history_service)
+    if "selected_history_session_id" not in st.session_state:
+        st.session_state.selected_history_session_id = None
+    if "saved_session_id" not in st.session_state:
+        st.session_state.saved_session_id = None
 
 
 def render_sidebar() -> None:
@@ -280,7 +295,7 @@ def render_sidebar() -> None:
 
         st.markdown("---")
         st.caption(f"**Version:** {APP_VERSION}")
-        st.caption(f"**Phase:** Phase 6 — Explainable Feedback Engine")
+        st.caption(f"**Phase:** Phase 7 — Session History & Analytics")
 
 
 def render_home_page(scenario_mgr: ScenarioManager) -> None:
@@ -294,9 +309,9 @@ def render_home_page(scenario_mgr: ScenarioManager) -> None:
         f"""
         <div class="banner-demo">
             <strong>ℹ️ Active Engine:</strong> Operating in <strong>{status.name}</strong> mode with 
-            integrated <strong>Explainable Feedback Engine (Phase 6)</strong>. Complete realistic role-play 
-            simulations and receive transparent, evidence-backed scores, WHAT / WHY / EVIDENCE / IMPACT / ACTION 
-            breakdowns, and prioritized practice guidance.
+            integrated <strong>Explainable Feedback Engine</strong> and <strong>Session History & Analytics (Phase 7)</strong>. 
+            Complete realistic simulations, receive transparent WHAT / WHY / EVIDENCE / IMPACT / ACTION guidance, 
+            and track your longitudinal progress over time.
         </div>
         """,
         unsafe_allow_html=True,
@@ -527,6 +542,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
                 st.session_state.current_feedback = None
+                st.session_state.saved_session_id = None
                 st.rerun()
         with ctrl_c2:
             if session.is_active():
@@ -540,6 +556,7 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
                 st.session_state.current_feedback = None
+                st.session_state.saved_session_id = None
                 st.rerun()
 
         st.markdown("---")
@@ -627,6 +644,21 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                         scenario=scenario,
                         persona=persona,
                     )
+
+                # Persist completed session to persistent SQLite history (idempotent, once per session)
+                if st.session_state.get("saved_session_id") != session.session_id:
+                    try:
+                        st.session_state.history_service.save_completed_session(
+                            session=session,
+                            scenario=scenario,
+                            persona=persona,
+                            evaluation=st.session_state.current_evaluation,
+                            feedback=st.session_state.current_feedback,
+                        )
+                        st.session_state.saved_session_id = session.session_id
+                    except Exception as err:
+                        st.warning(f"Could not persist session to local history: {err}")
+
                 render_evaluation_report(st.session_state.current_evaluation, st.session_state.current_feedback)
 
             # Render Conversation Analysis (Phase 4)
@@ -960,57 +992,634 @@ def render_conversation_analysis_report(analysis: ConversationAnalysis) -> None:
 
 
 def render_history_page() -> None:
-    """Render the session history placeholder."""
-    st.markdown("## 📜 Practice Session History")
-    st.caption("Review your past simulation attempts, conversation transcripts, and progress.")
+    """Render the functional session history page with filtering and detail inspection."""
+    history_svc: HistoryService = st.session_state.history_service
 
+    # Check if user selected a specific session to inspect
+    selected_id = st.session_state.get("selected_history_session_id")
+    if selected_id:
+        render_historical_session_detail(selected_id)
+        return
+
+    st.markdown("## 📜 Practice Session History")
+    st.caption("Review previous simulation attempts, conversation transcripts, evaluation scores, and explainable feedback.")
+
+    # Filter & Search Controls
+    with st.expander("🔍 Filter & Sort History Records", expanded=False):
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        with f_col1:
+            mode_filter = st.selectbox("Practice Mode", ["All"] + PRACTICE_MODES, index=0)
+        with f_col2:
+            diff_filter = st.selectbox("Difficulty Tier", ["All"] + DIFFICULTY_LEVELS, index=0)
+        with f_col3:
+            min_score = st.slider("Minimum Score", min_value=0, max_value=100, value=0, step=5)
+        with f_col4:
+            sort_order = st.selectbox(
+                "Sort By",
+                ["completed_at DESC", "completed_at ASC", "overall_score DESC", "overall_score ASC"],
+                format_func=lambda x: {
+                    "completed_at DESC": "Date: Most Recent",
+                    "completed_at ASC": "Date: Oldest First",
+                    "overall_score DESC": "Score: Highest First",
+                    "overall_score ASC": "Score: Lowest First",
+                }[x],
+            )
+
+        st.markdown("**📅 Date Range Filter (Optional)**")
+        d_col1, d_col2 = st.columns(2)
+        with d_col1:
+            hist_start_date = st.date_input("From Date", value=None, key="history_start_date")
+        with d_col2:
+            hist_end_date = st.date_input("To Date", value=None, key="history_end_date")
+
+    start_date_iso = f"{hist_start_date.isoformat()}T00:00:00" if hist_start_date else None
+    end_date_iso = f"{hist_end_date.isoformat()}T23:59:59" if hist_end_date else None
+
+    sessions = history_svc.list_sessions(
+        mode=mode_filter if mode_filter != "All" else None,
+        difficulty=diff_filter if diff_filter != "All" else None,
+        start_date=start_date_iso,
+        end_date=end_date_iso,
+        min_score=float(min_score) if min_score > 0 else None,
+        order_by=sort_order,
+    )
+
+    if not sessions:
+        st.markdown(
+            """
+            <div class="banner-demo">
+                <strong>ℹ️ No Practice Records Found</strong><br>
+                No completed practice sessions match your selected filters. Practice a simulation scenario in the 
+                <strong>Practice</strong> tab and evaluate performance to automatically record historical data.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(f"**Showing {len(sessions)} recorded practice session{'s' if len(sessions) != 1 else ''}**")
+
+    for s in sessions:
+        mode_icon = MODE_ICONS.get(s.mode, "🎙️")
+        with st.container():
+            st.markdown(
+                f"""
+                <div class="metric-card" style="margin-bottom: 12px; padding: 16px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <span class="mode-badge">{mode_icon} {s.mode}</span>
+                            <span class="diff-badge">{s.difficulty}</span>
+                            <h3 style="margin: 8px 0 4px 0;">{s.scenario_name}</h3>
+                            <small style="color: #64748b;">Interviewer: <strong>{s.persona_name}</strong> • Completed: {s.formatted_date} • Turns: {s.turn_count} • Duration: {s.formatted_duration}</small>
+                        </div>
+                        <div style="text-align: right; min-width: 140px;">
+                            <div style="font-size: 2.2rem; font-weight: 700; color: #1e40af;">{s.overall_score:.1f} <span style="font-size: 1rem; color: #64748b;">/ 100</span></div>
+                            <small style="color: #475569;">Recorded Score</small>
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            col_b1, col_b2 = st.columns([5, 1])
+            with col_b1:
+                if st.button(f"🔍 Inspect Report & Transcript", key=f"inspect_{s.session_id}", use_container_width=True):
+                    st.session_state.selected_history_session_id = s.session_id
+                    st.rerun()
+            with col_b2:
+                if st.button("🗑️ Delete", key=f"del_{s.session_id}", use_container_width=True):
+                    history_svc.delete_session(s.session_id)
+                    st.rerun()
+
+
+def render_historical_session_detail(session_id: str) -> None:
+    """Render the full detail view for an individual historical session."""
+    history_svc: HistoryService = st.session_state.history_service
+    session = history_svc.get_session(session_id)
+
+    if not session:
+        st.error("Historical session record not found.")
+        if st.button("← Back to History List"):
+            st.session_state.selected_history_session_id = None
+            st.rerun()
+        return
+
+    if st.button("← Back to History List"):
+        st.session_state.selected_history_session_id = None
+        st.rerun()
+
+    mode_icon = MODE_ICONS.get(session.mode, "🎙️")
+    st.markdown(f"## {mode_icon} {session.scenario_name}")
     st.markdown(
-        """
-        <div class="banner-demo">
-            <strong>ℹ️ History Module Status</strong><br>
-            No practice sessions yet. Completed practice sessions and historical evaluations will appear here in a later phase.
+        f"**Role-Play Simulation** with **{session.persona_name}** • "
+        f"`{session.mode}` • `{session.difficulty}` • Completed: `{session.formatted_date}`"
+    )
+
+    # Historical Score Hero Card
+    st.markdown(
+        f"""
+        <div class="score-hero-card">
+            <h1 style="font-size: 3rem; margin: 0; color: #1e40af;">{session.overall_score:.1f} <span style="font-size: 1.5rem; color: #64748b;">/ {session.max_score:.0f}</span></h1>
+            <p style="font-size: 1.15rem; margin-top: 8px; font-weight: 600; color: #1e293b;">Historical Overall Performance Score</p>
+            <span class="mode-badge">{session.mode}</span>
+            <span class="diff-badge">{session.difficulty}</span>
+            <div style="margin-top: 8px; color: #475569; font-size: 0.9rem;">
+                Turns: <strong>{session.turn_count}</strong> • Duration: <strong>{session.formatted_duration}</strong>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+    st.progress(min(1.0, max(0.0, session.overall_score / 100.0)))
 
-    st.info(
-        "💡 **What's Coming in Future Phases:**\n\n"
-        "- Complete conversation transcripts and turn breakdowns\n"
-        "- Historical performance scores and grading trends\n"
-        "- Persona feedback logs and actionable improvement plans\n"
-        "- Audio recording replays and playback analysis"
-    )
+    tab_eval, tab_feed, tab_transcript = st.tabs([
+        "🏆 Evaluation Breakdown (Phase 5)",
+        "💡 Explainable Feedback (Phase 6)",
+        "📜 Conversation Transcript",
+    ])
+
+    with tab_eval:
+        st.markdown("### 🏆 Phase 5 Evaluation Breakdown")
+        st.caption("Dimensional scores, evidence, and rationale recorded at session completion.")
+
+        if session.dimensions:
+            for dim in session.dimensions:
+                st.markdown(
+                    f"""
+                    <div class="dimension-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0; color: #1e40af;">{dim.name}</h4>
+                            <span style="font-size: 1.2rem; font-weight: 700; color: #1e40af;">
+                                {f"{dim.score:.1f} / 100" if dim.score is not None else "Not Evaluated"}
+                            </span>
+                        </div>
+                        <p style="margin: 6px 0; font-size: 0.92rem; color: #334155;"><strong>Rationale:</strong> {dim.rationale}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if dim.evidence:
+                    with st.expander(f"Evidence for {dim.name}", expanded=False):
+                        for ev in dim.evidence:
+                            st.write(f"- {ev}")
+        elif session.evaluation and session.evaluation.dimensions:
+            for dim in session.evaluation.dimensions:
+                st.markdown(
+                    f"""
+                    <div class="dimension-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0; color: #1e40af;">{dim.name}</h4>
+                            <span style="font-size: 1.2rem; font-weight: 700; color: #1e40af;">{dim.score:.1f} / 100</span>
+                        </div>
+                        <p style="margin: 6px 0; font-size: 0.92rem; color: #334155;"><strong>Rationale:</strong> {dim.rationale}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.info("No detailed dimensional scores recorded.")
+
+    with tab_feed:
+        st.markdown("### 💡 Explainable Feedback (Phase 6)")
+        st.caption("Saved WHAT / WHY / EVIDENCE / IMPACT / ACTION feedback guidance.")
+
+        if session.feedback:
+            if session.feedback.overall_summary:
+                st.markdown(
+                    f"""
+                    <div class="feedback-card" style="border-left: 4px solid #3b82f6;">
+                        <h4 style="margin: 0 0 6px 0; color: #1e40af;">💡 Executive Feedback Summary</h4>
+                        <p style="margin: 0; font-size: 0.98rem; line-height: 1.5;">{session.feedback.overall_summary}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            if session.feedback.priority_actions:
+                st.markdown("#### 🎯 Priority Practice Actions")
+                action_cols = st.columns(min(len(session.feedback.priority_actions), 3))
+                for i, act in enumerate(session.feedback.priority_actions[:3]):
+                    badge_cls = (
+                        "badge-priority-high"
+                        if act.priority == "High Priority"
+                        else ("badge-priority-med" if act.priority == "Medium Priority" else "badge-priority-low")
+                    )
+                    with action_cols[i % len(action_cols)]:
+                        st.markdown(
+                            f"""
+                            <div class="feedback-card" style="height: 100%;">
+                                <span class="{badge_cls}">{act.priority}</span>
+                                <h4 style="margin: 8px 0 6px 0; font-size: 1.05rem;">{act.title}</h4>
+                                <div class="action-callout">
+                                    <strong>Guideline:</strong> {act.action}
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+            col_str, col_imp = st.columns(2)
+            with col_str:
+                st.markdown("#### 🌟 Evidence-Backed Strengths")
+                for s in session.feedback.strengths:
+                    s_evi = format_evidence_display(s.evidence, evidence_type=s.evidence_type, source_reference=s.source_reference)
+                    st.markdown(
+                        f"""
+                        <div class="strength-item" style="margin-bottom: 12px; padding: 12px 14px;">
+                            <h4 style="margin: 0 0 4px 0; color: #065f46;">✓ {s.title}</h4>
+                            <p style="margin: 0 0 4px 0; font-size: 0.9rem;"><strong>WHAT:</strong> {s.what}</p>
+                            <p style="margin: 0 0 4px 0; font-size: 0.85rem; color: #047857;"><strong>EVIDENCE:</strong> <em>{s_evi}</em></p>
+                            <p style="margin: 0; font-size: 0.85rem; color: #475569;"><strong>IMPACT:</strong> {s.impact}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+            with col_imp:
+                st.markdown("#### 📈 Key Actionable Improvements")
+                for imp in session.feedback.improvements:
+                    badge_cls = (
+                        "badge-priority-high"
+                        if imp.priority == "High Priority"
+                        else ("badge-priority-med" if imp.priority == "Medium Priority" else "badge-priority-low")
+                    )
+                    imp_evi = format_evidence_display(imp.evidence, evidence_type=imp.evidence_type, source_reference=imp.source_reference)
+                    st.markdown(
+                        f"""
+                        <div class="improve-item" style="margin-bottom: 12px; padding: 12px 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <h4 style="margin: 0; color: #92400e;">⚡ {imp.title}</h4>
+                                <span class="{badge_cls}">{imp.priority}</span>
+                            </div>
+                            <p style="margin: 0 0 4px 0; font-size: 0.9rem;"><strong>WHAT:</strong> {imp.what}</p>
+                            <p style="margin: 0 0 4px 0; font-size: 0.85rem; color: #92400e;"><strong>WHY:</strong> {imp.why}</p>
+                            <p style="margin: 0 0 6px 0; font-size: 0.85rem; color: #475569;"><strong>EVIDENCE:</strong> <em>{imp_evi}</em></p>
+                            <div class="action-callout" style="margin-top: 4px; padding: 8px 10px;">
+                                <strong style="color: #1e40af;">ACTION:</strong> {imp.action}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+        elif session.evaluation:
+            col_str, col_imp = st.columns(2)
+            with col_str:
+                st.markdown("#### 🌟 Strengths")
+                for s in session.evaluation.strengths:
+                    st.markdown(f'<div class="strength-item">✓ {s}</div>', unsafe_allow_html=True)
+            with col_imp:
+                st.markdown("#### 📈 Improvement Areas")
+                for imp in session.evaluation.improvement_areas:
+                    st.markdown(f'<div class="improve-item">⚡ {imp}</div>', unsafe_allow_html=True)
+        else:
+            st.info("No explainable feedback stored for this session.")
+
+    with tab_transcript:
+        st.markdown("### 📜 Conversation Transcript")
+        st.caption("Verbatim dialogue between candidate and AI persona. Internal system instructions are strictly excluded.")
+
+        user_facing_msgs = session.user_facing_messages()
+        if not user_facing_msgs:
+            st.info("No conversation messages recorded for this session.")
+        else:
+            for msg in user_facing_msgs:
+                if msg.role == "assistant":
+                    with st.chat_message("assistant", avatar="🤖"):
+                        st.markdown(f"**{session.persona_name}**")
+                        st.markdown(msg.content)
+                elif msg.role == "user":
+                    with st.chat_message("user", avatar="👤"):
+                        st.markdown("**You**")
+                        st.markdown(msg.content)
 
 
 def render_analytics_page() -> None:
-    """Render the analytics and evaluation placeholder."""
-    st.markdown("## 📊 Performance Analytics")
-    st.caption("Gain deep insights into communication fluency, clarity, confidence, and topical coverage.")
+    """Render the longitudinal performance analytics and session comparison page."""
+    analytics_svc: AnalyticsService = st.session_state.analytics_service
+    history_svc: HistoryService = st.session_state.history_service
 
-    st.markdown(
-        """
-        <div class="banner-demo">
-            <strong>ℹ️ Analytics Module Status</strong><br>
-            Analytics will become available after practice sessions are completed, evaluated, and saved to history.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown("## 📊 Performance Analytics & Progress")
+    st.caption("Descriptive statistics, longitudinal trends, recurring patterns, and neutral session comparisons.")
+
+    # Filter Controls
+    with st.expander("🔍 Filter Analytics Scope", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            mode_filter = st.selectbox("Practice Mode", ["All"] + PRACTICE_MODES, key="analytics_mode_filter")
+        with c2:
+            diff_filter = st.selectbox("Difficulty Tier", ["All"] + DIFFICULTY_LEVELS, key="analytics_diff_filter")
+
+        st.markdown("**📅 Date Range Filter (Optional)**")
+        ad_col1, ad_col2 = st.columns(2)
+        with ad_col1:
+            ana_start_date = st.date_input("From Date", value=None, key="analytics_start_date")
+        with ad_col2:
+            ana_end_date = st.date_input("To Date", value=None, key="analytics_end_date")
+
+    ana_start_iso = f"{ana_start_date.isoformat()}T00:00:00" if ana_start_date else None
+    ana_end_iso = f"{ana_end_date.isoformat()}T23:59:59" if ana_end_date else None
+
+    sessions = analytics_svc.get_sessions(
+        mode=mode_filter if mode_filter != "All" else None,
+        difficulty=diff_filter if diff_filter != "All" else None,
+        start_date=ana_start_iso,
+        end_date=ana_end_iso,
     )
 
-    st.info(
-        "💡 **Planned Analytics Metrics (Future Phases):**\n\n"
-        "- **Clarity & Conciseness:** Word count efficiency and filler word frequency\n"
-        "- **STAR Framework Adherence:** Situation, Task, Action, Result coverage trends\n"
-        "- **Persona Alignment:** Relevance to target audience and industry vocabulary\n"
-        "- **Confidence & Tone:** Voice sentiment and hesitation index (Voice Practice)"
-    )
+    if not sessions:
+        st.markdown(
+            """
+            <div class="banner-demo">
+                <strong>ℹ️ No Practice Data for Analytics</strong><br>
+                Complete practice sessions to unlock longitudinal trends, dimension breakdowns, recurring patterns, and comparisons.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    # High-level KPIs
+    summary = analytics_svc.get_overall_summary(sessions)
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
+    with kpi_col1:
+        st.metric("Completed Sessions", summary["total_sessions"])
+    with kpi_col2:
+        st.metric("Average Score", f"{summary['average_score']:.1f} / 100")
+    with kpi_col3:
+        st.metric("Highest Recorded Score", f"{summary['highest_recorded_score']:.1f}")
+    with kpi_col4:
+        st.metric("Lowest Recorded Score", f"{summary['lowest_recorded_score']:.1f}")
+    with kpi_col5:
+        st.metric("Average Turns", f"{summary['average_turns']:.1f}")
+
+    st.markdown("---")
+
+    # Longitudinal Progress Trend
+    st.markdown("### 📈 Chronological Score Progression")
+    progress_data = analytics_svc.get_chronological_progress(sessions)
+
+    if len(progress_data) < 2:
+        st.info(
+            "ℹ️ **1 practice session recorded.** Complete at least two practice sessions to display a chronological trend line."
+        )
+    else:
+        # Build simple chart dictionary
+        chart_data = {
+            f"#{p['session_number']} {p['scenario'][:16]}...": p["score"]
+            for p in progress_data
+        }
+        st.line_chart(chart_data)
+
+    st.markdown("---")
+
+    # Mode & Difficulty Breakdowns
+    col_mb, col_db = st.columns(2)
+    with col_mb:
+        st.markdown("### 👔 Mode Performance Breakdown")
+        mode_stats = analytics_svc.get_mode_breakdown(sessions)
+        if mode_stats:
+            for ms in mode_stats:
+                st.markdown(
+                    f"""
+                    <div class="metric-card" style="padding: 12px 16px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>{MODE_ICONS.get(ms['mode'], '🎙️')} {ms['mode']}</strong>
+                            <span style="font-weight: 700; color: #1e40af;">Avg: {ms['average_score']:.1f}</span>
+                        </div>
+                        <small style="color: #64748b;">Sessions: {ms['session_count']} • Range: {ms['lowest_score']:.1f} – {ms['highest_score']:.1f}</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("No mode-specific records found.")
+
+    with col_db:
+        st.markdown("### 🎯 Difficulty Tier Breakdown")
+        diff_stats = analytics_svc.get_difficulty_breakdown(sessions)
+        if diff_stats:
+            for ds in diff_stats:
+                st.markdown(
+                    f"""
+                    <div class="metric-card" style="padding: 12px 16px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>{ds['difficulty']}</strong>
+                            <span style="font-weight: 700; color: #1e40af;">Avg: {ds['average_score']:.1f}</span>
+                        </div>
+                        <small style="color: #64748b;">Sessions: {ds['session_count']} • Range: {ds['lowest_score']:.1f} – {ds['highest_score']:.1f}</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("No difficulty breakdown records found.")
+
+    st.markdown("---")
+
+    # Dimension Historical Averages
+    st.markdown("### 📊 Historical Dimension Averages")
+    st.caption("Descriptive averages across all evaluated dimensions.")
+    dim_stats = analytics_svc.get_dimension_averages(sessions)
+    if dim_stats:
+        dim_cols = st.columns(min(len(dim_stats), 3))
+        for idx, ds in enumerate(dim_stats):
+            with dim_cols[idx % len(dim_cols)]:
+                st.markdown(
+                    f"""
+                    <div class="dimension-card" style="padding: 12px 16px; margin-bottom: 8px;">
+                        <h4 style="margin: 0; color: #1e40af; font-size: 1rem;">{ds['dimension']}</h4>
+                        <div style="font-size: 1.6rem; font-weight: 700; color: #1e40af; margin: 4px 0;">
+                            {ds['average_score']:.1f} <span style="font-size: 0.85rem; color: #64748b;">/ 100</span>
+                        </div>
+                        <small style="color: #64748b;">Evaluated in {ds['evaluations_count']} session{'s' if ds['evaluations_count'] != 1 else ''}</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.caption("No dimensional score records found.")
+
+    st.markdown("---")
+
+    # Recurring Patterns (Improvements & Strengths)
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.markdown("### 📈 Recurring Improvement Themes")
+        st.caption("Frequently observed actionable areas across stored sessions.")
+        improvements = analytics_svc.get_recurring_improvements(sessions)
+        if improvements:
+            for imp in improvements:
+                st.markdown(
+                    f"""
+                    <div class="improve-item" style="padding: 10px 14px; margin-bottom: 8px;">
+                        <strong>⚡ {imp['theme']}</strong><br>
+                        <small style="color: #475569;">{imp['description']} ({imp['percentage']}% of sessions)</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("No recurring improvement patterns detected yet.")
+
+    with col_p2:
+        st.markdown("### 🌟 Frequently Observed Strengths")
+        st.caption("Verifiable competencies consistently demonstrated across sessions.")
+        strengths = analytics_svc.get_recurring_strengths(sessions)
+        if strengths:
+            for st_item in strengths:
+                st.markdown(
+                    f"""
+                    <div class="strength-item" style="padding: 10px 14px; margin-bottom: 8px;">
+                        <strong>✓ {st_item['strength']}</strong><br>
+                        <small style="color: #475569;">{st_item['description']} ({st_item['percentage']}% of sessions)</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("No recurring strength patterns detected yet.")
+
+    st.markdown("---")
+
+    # Two-Session Comparison Tool
+    st.markdown("### ⚖️ Side-by-Side Session Comparison")
+    st.caption("Select any two completed sessions to compare scores, dimensions, and feedback side-by-side.")
+
+    all_sessions = history_svc.list_sessions(order_by="completed_at DESC")
+    if len(all_sessions) < 2:
+        st.info("ℹ️ At least two completed practice sessions are required to perform a comparison.")
+    else:
+        session_options = {
+            f"{s.formatted_date} — {s.scenario_name} ({s.mode}, Score: {s.overall_score:.1f})": s.session_id
+            for s in all_sessions
+        }
+        labels = list(session_options.keys())
+
+        col_comp1, col_comp2 = st.columns(2)
+        with col_comp1:
+            choice_a = st.selectbox("Baseline Session (Session A)", labels, index=1 if len(labels) > 1 else 0)
+        with col_comp2:
+            choice_b = st.selectbox("Comparison Session (Session B)", labels, index=0)
+
+        id_a = session_options[choice_a]
+        id_b = session_options[choice_b]
+
+        if id_a == id_b:
+            st.warning("Please select two distinct sessions to compare.")
+        else:
+            sess_a = history_svc.get_session(id_a)
+            sess_b = history_svc.get_session(id_b)
+            if sess_a and sess_b:
+                comp = compare_sessions(sess_a, sess_b)
+
+                # Score Delta Hero Callout
+                score_delta = comp["overall_score_difference"]
+                delta_color = "#10b981" if score_delta > 0 else ("#ef4444" if score_delta < 0 else "#64748b")
+                st.markdown(
+                    f"""
+                    <div class="metric-card" style="text-align: center; border-left: 5px solid {delta_color};">
+                        <h4 style="margin: 0; color: #1e293b;">{comp['overall_score_description']}</h4>
+                        <div style="font-size: 2.4rem; font-weight: 700; color: {delta_color}; margin: 8px 0;">
+                            {score_delta:+.1f} Points
+                        </div>
+                        <small style="color: #64748b;">
+                            Session A ({comp['session_a']['date']}): <strong>{comp['session_a']['overall_score']:.1f}</strong> ➔ 
+                            Session B ({comp['session_b']['date']}): <strong>{comp['session_b']['overall_score']:.1f}</strong>
+                        </small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                if sess_a.mode != sess_b.mode or sess_a.scenario_id != sess_b.scenario_id:
+                    st.caption(
+                        "ℹ️ *Note: Selected sessions represent different practice modes or scenarios. "
+                        "Recorded score differences reflect differing competency rubrics and scenario expectations "
+                        "rather than an assessment of change in candidate ability.*"
+                    )
+
+                # Metadata Comparison
+                st.markdown("#### 📋 Session Metadata Comparison")
+                c_meta1, c_meta2 = st.columns(2)
+                with c_meta1:
+                    st.markdown(
+                        f"""
+                        **Session A (Baseline):**
+                        - **Scenario:** {comp['session_a']['scenario']}
+                        - **Mode:** {comp['session_a']['mode']}
+                        - **Difficulty:** {comp['session_a']['difficulty']}
+                        - **Interviewer:** {comp['session_a']['persona']}
+                        - **Turns:** {comp['session_a']['turn_count']}
+                        - **Duration:** {comp['session_a']['duration']}
+                        """
+                    )
+                with c_meta2:
+                    st.markdown(
+                        f"""
+                        **Session B (Comparison):**
+                        - **Scenario:** {comp['session_b']['scenario']}
+                        - **Mode:** {comp['session_b']['mode']}
+                        - **Difficulty:** {comp['session_b']['difficulty']}
+                        - **Interviewer:** {comp['session_b']['persona']}
+                        - **Turns:** {comp['session_b']['turn_count']}
+                        - **Duration:** {comp['session_b']['duration']}
+                        """
+                    )
+
+                # Dimensional Differences
+                st.markdown("#### 📊 Dimensional Score Comparisons")
+                dim_comps = comp["dimension_comparisons"]
+                for dc in dim_comps:
+                    sc_a = f"{dc['score_a']:.1f}" if dc['score_a'] is not None else "N/A"
+                    sc_b = f"{dc['score_b']:.1f}" if dc['score_b'] is not None else "N/A"
+                    diff_val = dc['difference']
+                    diff_color = "#10b981" if diff_val and diff_val > 0 else ("#ef4444" if diff_val and diff_val < 0 else "#64748b")
+
+                    st.markdown(
+                        f"""
+                        <div class="dimension-card" style="padding: 10px 14px; margin-bottom: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong>{dc['dimension']}</strong>
+                                <div>
+                                    <span style="color: #64748b;">Session A: {sc_a}</span> &nbsp;|&nbsp;
+                                    <span style="color: #1e40af;">Session B: {sc_b}</span> &nbsp;|&nbsp;
+                                    <span style="font-weight: 700; color: {diff_color};">Diff: {dc['difference_display']}</span>
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                # Common & Distinct Strengths/Improvements
+                col_cs, col_ci = st.columns(2)
+                with col_cs:
+                    st.markdown("#### 🌟 Strength Patterns")
+                    if comp["common_strengths"]:
+                        st.write("**Demonstrated in both sessions:**")
+                        for s in comp["common_strengths"]:
+                            st.write(f"- ✓ {s}")
+                    if comp["distinct_b_strengths"]:
+                        st.write("**New in Session B:**")
+                        for s in comp["distinct_b_strengths"]:
+                            st.write(f"- 🌟 {s}")
+
+                with col_ci:
+                    st.markdown("#### 📈 Improvement Patterns")
+                    if comp["common_improvements"]:
+                        st.write("**Shared across both sessions:**")
+                        for imp in comp["common_improvements"]:
+                            st.write(f"- ⚡ {imp}")
+                    if comp["distinct_b_improvements"]:
+                        st.write("**Specific to Session B:**")
+                        for imp in comp["distinct_b_improvements"]:
+                            st.write(f"- 🔍 {imp}")
 
 
 def render_settings_page(ai_provider) -> None:
     """Render the application configuration and provider settings page."""
     st.markdown("## ⚙️ Application Settings")
-    st.caption("Inspect application metadata, AI provider connectivity, and configuration.")
+    st.caption("Inspect application metadata, AI provider connectivity, and persistent storage configuration.")
 
     col1, col2 = st.columns(2)
 
@@ -1021,7 +1630,7 @@ def render_settings_page(ai_provider) -> None:
             - **Application:** `{APP_NAME}`
             - **Subtitle:** `{APP_SUBTITLE}`
             - **Version:** `{APP_VERSION}`
-            - **Current Phase:** `Phase 6 — Explainable Feedback Engine`
+            - **Current Phase:** `Phase 7 — Session History & Analytics`
             - **Architecture:** Modular Python / Streamlit
             """
         )
@@ -1037,6 +1646,31 @@ def render_settings_page(ai_provider) -> None:
             - **Details:** {status.status_message}
             """
         )
+
+    st.markdown("---")
+    st.markdown("### 🗄️ Local Persistent Storage (SQLite)")
+    history_svc: HistoryService = st.session_state.history_service
+    session_count = history_svc.count_sessions()
+    db_path = getattr(history_svc.repository, "db_path", DEFAULT_DB_PATH)
+
+    st.markdown(
+        f"""
+        - **Storage Engine:** `SQLite (Python Standard Library)`
+        - **Database Path:** `{db_path}`
+        - **Total Saved Sessions:** `{session_count}`
+        - **Privacy Guarantee:** All conversational transcripts, scores, and feedback records remain on your local machine. 
+          No conversation data is transmitted to external database servers or tracked externally.
+        """
+    )
+
+    with st.expander("⚠️ Storage Maintenance / Clear History"):
+        st.warning("Clearing history will permanently remove all stored practice sessions and analytics.")
+        confirm_clear = st.checkbox("I understand and wish to clear all historical records.")
+        if confirm_clear:
+            if st.button("🗑️ Permanently Clear History", type="secondary"):
+                history_svc.clear_all()
+                st.success("All session history successfully cleared.")
+                st.rerun()
 
     st.markdown("---")
     st.markdown("### 🔑 API Configuration & Security")
@@ -1058,6 +1692,7 @@ AI_MODEL=gpt-4o-mini
 """,
             language="bash",
         )
+
 
 
 def main() -> None:

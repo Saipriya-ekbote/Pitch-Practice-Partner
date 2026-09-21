@@ -36,6 +36,13 @@ htmlcov/
 .env.local
 .streamlit/secrets.toml
 
+# Persistent Database Storage
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/**/*.db
+
 # IDE & OS
 .vscode/
 .idea/
