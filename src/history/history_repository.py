@@ -81,7 +81,9 @@ class HistoryRepository:
                     duration_seconds REAL,
                     evaluation_status TEXT NOT NULL DEFAULT 'completed',
                     evaluation_json TEXT,
-                    feedback_json TEXT
+                    feedback_json TEXT,
+                    interaction_mode TEXT DEFAULT 'text',
+                    speech_metrics_json TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS messages (
@@ -110,11 +112,19 @@ class HistoryRepository:
                 CREATE INDEX IF NOT EXISTS idx_sessions_mode ON sessions(mode);
                 CREATE INDEX IF NOT EXISTS idx_sessions_completed ON sessions(completed_at);
                 CREATE INDEX IF NOT EXISTS idx_sessions_difficulty ON sessions(difficulty);
+                CREATE INDEX IF NOT EXISTS idx_sessions_interaction_mode ON sessions(interaction_mode);
                 CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
                 CREATE INDEX IF NOT EXISTS idx_dimension_session ON dimension_scores(session_id);
                 CREATE INDEX IF NOT EXISTS idx_dimension_name ON dimension_scores(dimension_name);
                 """
             )
+            # Automatic non-destructive migration for existing Phase 7 tables
+            cursor.execute("PRAGMA table_info(sessions);")
+            columns = [row["name"] for row in cursor.fetchall()]
+            if "interaction_mode" not in columns:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN interaction_mode TEXT DEFAULT 'text';")
+            if "speech_metrics_json" not in columns:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN speech_metrics_json TEXT;")
             conn.commit()
 
     def save_session(self, session: HistoricalSession) -> bool:
@@ -129,6 +139,13 @@ class HistoryRepository:
             eval_json_str = json.dumps(eval_dict) if eval_dict is not None else session.raw_evaluation_json
             feed_json_str = json.dumps(feed_dict) if feed_dict is not None else session.raw_feedback_json
 
+            speech_json_str = (
+                json.dumps(session.speech_metrics)
+                if session.speech_metrics is not None
+                else session.raw_speech_metrics_json
+            )
+            inter_mode = getattr(session, "interaction_mode", "text") or "text"
+
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -137,8 +154,9 @@ class HistoryRepository:
                         session_id, created_at, completed_at, mode, scenario_id,
                         scenario_name, persona_id, persona_name, difficulty,
                         turn_count, overall_score, max_score, duration_seconds,
-                        evaluation_status, evaluation_json, feedback_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        evaluation_status, evaluation_json, feedback_json,
+                        interaction_mode, speech_metrics_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(session_id) DO UPDATE SET
                         completed_at=excluded.completed_at,
                         turn_count=excluded.turn_count,
@@ -146,7 +164,9 @@ class HistoryRepository:
                         duration_seconds=excluded.duration_seconds,
                         evaluation_status=excluded.evaluation_status,
                         evaluation_json=excluded.evaluation_json,
-                        feedback_json=excluded.feedback_json;
+                        feedback_json=excluded.feedback_json,
+                        interaction_mode=excluded.interaction_mode,
+                        speech_metrics_json=excluded.speech_metrics_json;
                     """,
                     (
                         session.session_id,
@@ -165,6 +185,8 @@ class HistoryRepository:
                         session.evaluation_status,
                         eval_json_str,
                         feed_json_str,
+                        inter_mode,
+                        speech_json_str,
                     ),
                 )
 
@@ -220,7 +242,8 @@ class HistoryRepository:
                     SELECT session_id, created_at, completed_at, mode, scenario_id,
                            scenario_name, persona_id, persona_name, difficulty,
                            turn_count, overall_score, max_score, duration_seconds,
-                           evaluation_status, evaluation_json, feedback_json
+                           evaluation_status, evaluation_json, feedback_json,
+                           interaction_mode, speech_metrics_json
                     FROM sessions
                     WHERE session_id = ?;
                     """,
@@ -299,6 +322,22 @@ class HistoryRepository:
                     except Exception:
                         feedback_obj = None
 
+                speech_metrics_dict = None
+                raw_sm_json = None
+                try:
+                    raw_sm_json = row["speech_metrics_json"] if "speech_metrics_json" in row.keys() else None
+                    if raw_sm_json:
+                        speech_metrics_dict = json.loads(raw_sm_json)
+                except Exception:
+                    speech_metrics_dict = None
+
+                mode_interaction = "text"
+                try:
+                    if "interaction_mode" in row.keys() and row["interaction_mode"]:
+                        mode_interaction = row["interaction_mode"]
+                except Exception:
+                    mode_interaction = "text"
+
                 return HistoricalSession(
                     session_id=row["session_id"],
                     created_at=row["created_at"],
@@ -314,6 +353,9 @@ class HistoryRepository:
                     max_score=row["max_score"] or 100.0,
                     duration_seconds=row["duration_seconds"],
                     evaluation_status=row["evaluation_status"] or "completed",
+                    interaction_mode=mode_interaction,
+                    speech_metrics=speech_metrics_dict,
+                    raw_speech_metrics_json=raw_sm_json,
                     messages=messages,
                     dimensions=dimensions,
                     evaluation=eval_obj,
@@ -333,6 +375,7 @@ class HistoryRepository:
         end_date: Optional[str] = None,
         min_score: Optional[float] = None,
         max_score: Optional[float] = None,
+        interaction_mode: Optional[str] = None,
         order_by: str = "completed_at DESC",
     ) -> List[HistoricalSession]:
         """
@@ -385,6 +428,10 @@ class HistoryRepository:
             query += " AND overall_score <= ?"
             params.append(max_score)
 
+        if interaction_mode and interaction_mode != "All":
+            query += " AND interaction_mode = ?"
+            params.append(interaction_mode)
+
         query += f" ORDER BY {order_clause};"
 
         results: List[HistoricalSession] = []
@@ -419,6 +466,7 @@ class HistoryRepository:
         self,
         mode: Optional[str] = None,
         difficulty: Optional[str] = None,
+        interaction_mode: Optional[str] = None,
     ) -> int:
         """Count total completed sessions matching optional mode or difficulty."""
         try:
@@ -432,6 +480,10 @@ class HistoryRepository:
             if difficulty and difficulty != "All":
                 query += " AND difficulty = ?"
                 params.append(difficulty)
+
+            if interaction_mode and interaction_mode != "All":
+                query += " AND interaction_mode = ?"
+                params.append(interaction_mode)
 
             with self._get_connection() as conn:
                 cursor = conn.cursor()

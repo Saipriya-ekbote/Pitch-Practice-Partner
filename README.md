@@ -39,10 +39,10 @@ Traditional interview and communication prep tools suffer from major limitations
 
 ## 🚀 Current Phase
 
-**Phase 7 — Session History & Longitudinal Analytics**
+**Phase 8 — Voice Interaction & Speech Intelligence**
 
 > [!NOTE]
-> Phase 7 introduces a lightweight local persistence layer powered by Python's standard-library SQLite engine. Completed practice sessions, full transcripts, dimensional evaluation scores, and explainable feedback are stored permanently without recalculation. Users can review past sessions, track longitudinal progress over time, discover recurring strength/improvement themes, and compare sessions side-by-side using objective, neutral descriptive language.
+> Phase 8 introduces an optional voice interaction layer surrounding the existing conversation, evaluation, feedback, and history architecture. Candidates can speak directly via microphone or file upload, inspect and edit simulated speech-to-text transcripts, listen to synthesized AI persona audio responses via text-to-speech, and review objective, factual delivery metrics (duration, word count, words per minute, vocal filler percentage). Text mode remains completely functional and authoritative, with zero raw audio persistence.
 
 ---
 
@@ -254,6 +254,74 @@ pip install -r requirements.txt
 
 ---
 
+## 🎙️ Voice Interaction & Speech Intelligence (Phase 8)
+
+Phase 8 introduces an **optional voice input/output layer** cleanly decoupled around the established conversation, intelligence, evaluation, feedback, and history architecture.
+
+The existing text-based practice flow remains 100% authoritative, accessible, and regression-free.
+
+### 📐 Voice Architecture & Pipeline
+
+```text
+                    USER SPEAKS
+                         ↓
+                    MICROPHONE (st.audio_input / upload fallback)
+                         ↓
+                  AUDIO VALIDATION (size, format, duration)
+                         ↓
+                    STT PROVIDER (DemoSTTProvider / injectable)
+                         ↓
+                     TRANSCRIPT
+                         ↓
+              USER REVIEWS / EDITS TRANSCRIPT
+                         ↓
+              EXISTING ConversationManager
+                         ↓
+                 EXISTING AI PROVIDER
+                         ↓
+                   AI RESPONSE TEXT
+                         ↓
+                    TTS PROVIDER (DemoTTSProvider / injectable)
+                         ↓
+                   AUDIO BYTES (in-memory PCM WAV)
+                         ↓
+                   st.audio() PLAYBACK
+```
+
+The transcript feeds directly through the existing pipeline without architectural duplication:
+`Transcript` → `ConversationManager` → `ConversationAnalyzer` → `EvaluationEngine` → `FeedbackEngine` → `HistoryService` → `AnalyticsService`.
+
+### 🎙️ Microphone Recording & Fallback
+* **Native Microphone Input:** Uses Streamlit's native `st.audio_input` component when supported by the candidate's browser environment.
+* **Audio File Upload Fallback:** If microphone hardware permissions are disabled or unsupported by the browser, a file upload widget allows uploading recorded speech in `.wav`, `.webm`, or `.ogg` formats.
+* **Text Mode Always Available:** Candidates can switch between **Text** and **Voice** interaction at any point during active practice.
+
+### 🤖 Zero-Dependency Demo STT & Demo TTS
+* **Demo STT Provider (`DemoSTTProvider`):** Completely offline, deterministic, zero network, zero API key requirement. Explicitly returns simulated transcripts labeled with `[DEMO VOICE TRANSCRIPT]`. Sets `is_simulated = True` and `confidence = None` (strictly does not fabricate transcription confidence).
+* **Demo TTS Provider (`DemoTTSProvider`):** Synthesizes deterministic 16-bit mono PCM WAV audio bytes directly in memory using the Python standard library (`wave`, `struct`, `io`). Produces browser-playable WAV audio without external third-party audio packages.
+
+### 📊 Objective Speech Delivery Metrics
+Voice turns measure factual speech delivery indicators:
+1. **Recording Duration:** Measured audio duration in seconds.
+2. **Word Count:** Total words spoken in the transcribed response.
+3. **Speaking Pace (Words Per Minute — WPM):** Calculated strictly as `word_count / (recording_duration_seconds / 60)`. If reliable duration is unavailable, WPM is set to `None` without estimation.
+4. **Vocal Filler Percentage:** Reuses the authoritative Phase 4 Conversation Intelligence detector (`detect_filler_words`) to guarantee consistent filler counts between Text Mode and Voice Mode.
+
+> [!IMPORTANT]
+> **Technical vs. Psychological Delivery Metrics:**
+> Speech delivery metrics are strictly technical and linguistic observations (speaking speed, recording duration, and word frequency). They do **NOT** measure, infer, or diagnose psychological traits such as nervousness, emotional state, personality, confidence, honesty, or deception.
+
+### 🔒 Raw Audio Privacy Guarantees
+* **Zero Audio Persistence:** Raw audio byte streams are processed strictly in-memory and are **NEVER persisted** to SQLite, JSON records, Git, or disk logs.
+* **Metadata Only:** The database schema records only structured text transcripts, optional `interaction_mode="voice"`, and factual speech metrics JSON (`recording_duration_seconds`, `words_per_minute`, etc.).
+
+### ⚙️ Configuration & Troubleshooting
+* **Switching Modes:** Use the `Interaction Mode` selector (Text / Voice) in the practice workspace.
+* **Microphone Access:** Ensure microphone permissions are enabled for your browser at `http://localhost:8501`. If permissions are blocked, use the audio file upload expander or switch to Text Mode.
+* **TTS Playback Issues:** If synthesis fails for any reason, the AI persona's text response is always displayed normally, ensuring the conversation is never blocked or lost.
+
+---
+
 ## 🏃 Running the Application
 
 Launch the Streamlit web application:
@@ -288,7 +356,7 @@ python -m pytest -v
 Pitch-Practice-Partner/
 │
 ├── app.py                      # Streamlit application: practice, history, analytics & settings
-├── README.md                   # Project documentation updated for Phase 7
+├── README.md                   # Project documentation updated for Phase 8
 ├── requirements.txt            # Minimal Python dependencies
 ├── .gitignore                  # Git ignore rules for virtualenvs, cache, secrets & databases (*.db)
 ├── .env.example                # Example environment variables template
@@ -296,12 +364,26 @@ Pitch-Practice-Partner/
 ├── src/                        # Core source code
 │   ├── __init__.py             # Package metadata
 │   │
+│   ├── voice/                  # Voice Interaction & Speech Intelligence Engine (Phase 8)
+│   │   ├── __init__.py
+│   │   ├── voice_models.py     # AudioData, STTResult, TTSResult, SpeechMetrics
+│   │   ├── provider.py         # STTProvider and TTSProvider abstract interfaces
+│   │   ├── engine.py           # VoiceEngine with dependency injection
+│   │   ├── metrics.py          # Speech metrics & WPM calculation
+│   │   ├── audio_utils.py      # Audio validation & WAV duration extraction
+│   │   ├── stt/                # STT implementations
+│   │   │   ├── __init__.py
+│   │   │   └── demo_stt.py     # Zero-dependency deterministic Demo STT
+│   │   └── tts/                # TTS implementations
+│   │       ├── __init__.py
+│   │       └── demo_tts.py     # Zero-dependency standard-library PCM WAV Demo TTS
+│   │
 │   ├── history/                # Session History & Analytics Engine (Phase 7)
 │   │   ├── __init__.py
 │   │   ├── history_models.py   # HistoricalSession, HistoricalMessage, HistoricalDimensionScore
-│   │   ├── history_repository.py # SQLite database repository layer
+│   │   ├── history_repository.py # SQLite database repository layer with voice metadata
 │   │   ├── history_service.py  # Application persistence service, idempotency & validation
-│   │   └── analytics.py        # Descriptive statistics, progress tracking & session comparison
+│   │   └── analytics.py        # Descriptive statistics, progress tracking & voice statistics
 │   │
 │   ├── feedback/               # Explainable Feedback Engine (Phase 6)
 │   │   ├── __init__.py
@@ -347,12 +429,13 @@ Pitch-Practice-Partner/
 │   └── personas/
 │       └── personas.json       # AI personas with behaviors, concerns & styles
 │
-└── tests/                      # Automated unit test suite (135 tests passing)
+└── tests/                      # Automated unit test suite (161 tests passing)
     ├── __init__.py
     ├── test_scenarios.py       # Deterministic pytest suite (85 unit tests for Phases 1-5)
     ├── test_feedback.py        # Comprehensive Phase 6 unit test suite (26 unit tests)
     ├── test_history.py         # SQLite persistence, transcript & detail tests (14 tests)
-    └── test_analytics.py       # Longitudinal stats, trends & comparison tests (10 tests)
+    ├── test_analytics.py       # Longitudinal stats, trends & comparison tests (11 tests)
+    └── test_voice.py           # Phase 8 voice models, providers, engine, history & privacy tests (25 tests)
 ```
 
 ---

@@ -34,6 +34,8 @@ from src.history import (
     DEFAULT_DB_PATH,
 )
 from src.ai.provider import get_ai_provider
+from src.voice.engine import get_voice_service
+from src.voice.voice_models import AudioData, SpeechMetrics
 from src.utils import (
     APP_NAME,
     APP_SUBTITLE,
@@ -255,6 +257,45 @@ def init_session_state() -> None:
         st.session_state.selected_history_session_id = None
     if "saved_session_id" not in st.session_state:
         st.session_state.saved_session_id = None
+    if "interaction_mode" not in st.session_state:
+        st.session_state.interaction_mode = "Text"
+    if "voice_engine" not in st.session_state:
+        st.session_state.voice_engine = get_voice_service()
+    if "voice_transcript" not in st.session_state:
+        st.session_state.voice_transcript = ""
+    if "voice_metrics" not in st.session_state:
+        st.session_state.voice_metrics = None
+    if "voice_metrics_dict" not in st.session_state:
+        st.session_state.voice_metrics_dict = None
+    if "last_tts_audio" not in st.session_state:
+        st.session_state.last_tts_audio = None
+    if "last_processed_audio_bytes" not in st.session_state:
+        st.session_state.last_processed_audio_bytes = None
+    if "voice_record_counter" not in st.session_state:
+        st.session_state.voice_record_counter = 0
+    if "session_voice_metrics_list" not in st.session_state:
+        st.session_state.session_voice_metrics_list = []
+    if "pending_transcript_reset" not in st.session_state:
+        st.session_state.pending_transcript_reset = False
+
+
+def reset_voice_state() -> None:
+    """Reset voice input states cleanly between turns or upon manual reset."""
+    st.session_state.voice_transcript = ""
+    st.session_state.voice_metrics = None
+    st.session_state.voice_metrics_dict = None
+    st.session_state.last_processed_audio_bytes = None
+    st.session_state.voice_record_counter = st.session_state.get("voice_record_counter", 0) + 1
+    st.session_state.pending_transcript_reset = True
+
+    # In non-Streamlit/test environments (ctx is None), mutate directly for immediate state validation
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        if ctx is None and "voice_transcript_editor" in st.session_state:
+            st.session_state["voice_transcript_editor"] = ""
+    except Exception:
+        pass
 
 
 def render_sidebar() -> None:
@@ -295,7 +336,7 @@ def render_sidebar() -> None:
 
         st.markdown("---")
         st.caption(f"**Version:** {APP_VERSION}")
-        st.caption(f"**Phase:** Phase 7 — Session History & Analytics")
+        st.caption(f"**Phase:** Phase 8 — Voice Interaction & Speech Intelligence")
 
 
 def render_home_page(scenario_mgr: ScenarioManager) -> None:
@@ -492,6 +533,10 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.current_evaluation = None
                 st.session_state.current_feedback = None
                 st.session_state.is_practicing = True
+                st.session_state.saved_session_id = None
+                st.session_state.last_tts_audio = None
+                st.session_state.session_voice_metrics_list = []
+                reset_voice_state()
                 st.rerun()
 
     # --------------------------------------------------------------------------
@@ -510,6 +555,10 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.current_analysis = None
                 st.session_state.current_evaluation = None
                 st.session_state.current_feedback = None
+                st.session_state.saved_session_id = None
+                st.session_state.last_tts_audio = None
+                st.session_state.session_voice_metrics_list = []
+                reset_voice_state()
                 st.rerun()
             return
 
@@ -543,6 +592,9 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.current_evaluation = None
                 st.session_state.current_feedback = None
                 st.session_state.saved_session_id = None
+                st.session_state.last_tts_audio = None
+                st.session_state.session_voice_metrics_list = []
+                reset_voice_state()
                 st.rerun()
         with ctrl_c2:
             if session.is_active():
@@ -557,16 +609,39 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                 st.session_state.current_evaluation = None
                 st.session_state.current_feedback = None
                 st.session_state.saved_session_id = None
+                st.session_state.last_tts_audio = None
+                st.session_state.session_voice_metrics_list = []
+                reset_voice_state()
+                st.rerun()
+
+        # Interaction Mode Toggle
+        mode_cols = st.columns([1, 1, 2])
+        with mode_cols[0]:
+            sel_interaction = st.radio(
+                "Interaction Mode",
+                options=["Text", "Voice"],
+                index=0 if st.session_state.get("interaction_mode", "Text") == "Text" else 1,
+                horizontal=True,
+                key="interaction_mode_selector",
+            )
+            if sel_interaction != st.session_state.get("interaction_mode", "Text"):
+                st.session_state.interaction_mode = sel_interaction
                 st.rerun()
 
         st.markdown("---")
 
         # Render Chat History
-        for msg in session.conversation_history:
+        for i, msg in enumerate(session.conversation_history):
             if msg.role == "assistant":
                 with st.chat_message("assistant", avatar="🤖"):
                     st.markdown(f"**{persona.name}** *({persona.role})*")
                     st.markdown(msg.content)
+                    if (
+                        st.session_state.get("interaction_mode") == "Voice"
+                        and i == len(session.conversation_history) - 1
+                        and st.session_state.get("last_tts_audio")
+                    ):
+                        st.audio(st.session_state.last_tts_audio, format="audio/wav")
             elif msg.role == "user":
                 with st.chat_message("user", avatar="👤"):
                     st.markdown("**You**")
@@ -574,23 +649,167 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
 
         # Active Chat Input (when session is active)
         if session.is_active():
-            user_input = st.chat_input(
-                placeholder=f"Respond to {persona.name} as you would in a real {scenario.mode}..."
-            )
+            if st.session_state.get("interaction_mode", "Text") == "Text":
+                user_input = st.chat_input(
+                    placeholder=f"Respond to {persona.name} as you would in a real {scenario.mode}..."
+                )
 
-            if user_input:
-                try:
-                    with st.spinner(f"{persona.name} is thinking..."):
-                        updated_session, _ = conv_mgr.send_user_message(
-                            session=session,
-                            user_content=user_input,
-                            scenario=scenario,
-                            persona=persona,
+                if user_input:
+                    try:
+                        with st.spinner(f"{persona.name} is thinking..."):
+                            updated_session, _ = conv_mgr.send_user_message(
+                                session=session,
+                                user_content=user_input,
+                                scenario=scenario,
+                                persona=persona,
+                            )
+                            st.session_state.active_session = updated_session
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error processing response: {e}")
+            else:
+                # Voice Mode Input
+                st.markdown("### 🎙️ Voice Interaction")
+
+                # Apply deferred transcript reset BEFORE any voice widgets are instantiated in this run
+                if st.session_state.get("pending_transcript_reset"):
+                    st.session_state.voice_transcript = ""
+                    if "voice_transcript_editor" in st.session_state:
+                        st.session_state["voice_transcript_editor"] = ""
+                    st.session_state.pending_transcript_reset = False
+
+                has_mic = hasattr(st, "audio_input")
+                audio_val = None
+
+                # Generate a unique turn-and-reset-scoped key to avoid reusing stale widget manager state
+                rec_counter = st.session_state.get("voice_record_counter", 0)
+                turn_idx = len(session.conversation_history)
+                mic_key = f"voice_mic_{session.session_id}_{turn_idx}_{rec_counter}"
+                upload_key = f"voice_upload_{session.session_id}_{turn_idx}_{rec_counter}"
+
+                if has_mic:
+                    try:
+                        audio_val = st.audio_input(
+                            "Speak your response into the microphone:",
+                            key=mic_key,
                         )
-                        st.session_state.active_session = updated_session
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error processing response: {e}")
+                    except Exception as mic_err:
+                        st.warning(f"Microphone input initialization notice: {mic_err}. You can upload an audio file below.")
+                        has_mic = False
+                else:
+                    st.info("ℹ️ Native microphone input is not supported in this browser/environment. You can upload an audio recording below or switch to Text Mode.")
+
+                with st.expander("📁 Audio File Upload (Alternative / Fallback)", expanded=not has_mic):
+                    uploaded_audio = st.file_uploader(
+                        "Upload recorded speech (.wav, .webm, .ogg, .mp3):",
+                        type=["wav", "webm", "ogg", "mp3"],
+                        key=upload_key,
+                    )
+
+                effective_audio = audio_val or uploaded_audio
+                if effective_audio is not None:
+                    # Safely read raw audio bytes without stream exhaustion
+                    if hasattr(effective_audio, "getvalue"):
+                        audio_bytes = effective_audio.getvalue()
+                    else:
+                        audio_bytes = effective_audio.read()
+
+                    if audio_bytes and audio_bytes != st.session_state.get("last_processed_audio_bytes"):
+                        try:
+                            # Detect format from uploaded file name if applicable
+                            audio_format = "wav"
+                            if uploaded_audio is not None and effective_audio == uploaded_audio:
+                                fname = getattr(uploaded_audio, "name", "")
+                                if "." in fname:
+                                    ext = fname.rsplit(".", 1)[-1].lower()
+                                    if ext in ["wav", "webm", "ogg", "mp3", "m4a"]:
+                                        audio_format = ext
+
+                            voice_engine = st.session_state.voice_engine
+                            stt_res, metrics = voice_engine.process_speech_input(
+                                audio=audio_bytes,
+                                audio_format=audio_format,
+                            )
+                            st.session_state.last_processed_audio_bytes = audio_bytes
+                            st.session_state.voice_transcript = stt_res.text
+                            st.session_state.voice_transcript_editor = stt_res.text
+                            st.session_state.pending_transcript_reset = False
+                            st.session_state.voice_metrics = metrics
+                            st.session_state.voice_metrics_dict = metrics.to_dict()
+                            if stt_res.error:
+                                st.warning(f"Voice notice: {stt_res.error}")
+                        except Exception as ex:
+                            st.error(f"Voice processing error: {ex}")
+
+                st.markdown("#### 📝 Transcript Review & Edit")
+                edited_transcript = st.text_area(
+                    "Review or edit your response before sending:",
+                    value=st.session_state.get("voice_transcript", ""),
+                    height=100,
+                    key="voice_transcript_editor",
+                )
+
+                v_metrics = st.session_state.get("voice_metrics")
+                if v_metrics is not None and (v_metrics.word_count > 0 or v_metrics.recording_duration_seconds):
+                    m_c1, m_c2, m_c3 = st.columns(3)
+                    with m_c1:
+                        dur_str = f"{v_metrics.recording_duration_seconds:.1f}s" if v_metrics.recording_duration_seconds is not None else "N/A"
+                        st.metric("Recording Duration", dur_str)
+                    with m_c2:
+                        st.metric("Word Count", v_metrics.word_count)
+                    with m_c3:
+                        wpm_str = f"{v_metrics.words_per_minute:.1f} WPM" if v_metrics.words_per_minute is not None else "N/A"
+                        st.metric("Speaking Pace", wpm_str)
+                    st.caption("ℹ️ Speech metrics are objective acoustic/linguistic measurements and do not represent psychological assessments.")
+                    if getattr(v_metrics, "is_simulated", False):
+                        st.caption("ℹ️ Demo Mode: Speech-to-text transcript was generated deterministically by DemoSTTProvider.")
+
+                btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
+                with btn_col1:
+                    send_pressed = st.button("🚀 Send Response", type="primary", use_container_width=True)
+                with btn_col2:
+                    if st.button("🔄 Clear / Re-record", use_container_width=True):
+                        reset_voice_state()
+                        st.rerun()
+
+                if send_pressed:
+                    if not edited_transcript.strip():
+                        st.warning("Please record speech or enter a transcript before sending.")
+                    else:
+                        try:
+                            with st.spinner(f"{persona.name} is thinking..."):
+                                updated_session, assistant_msg = conv_mgr.send_user_message(
+                                    session=session,
+                                    user_content=edited_transcript.strip(),
+                                    scenario=scenario,
+                                    persona=persona,
+                                )
+                                st.session_state.active_session = updated_session
+
+                                # Record this turn's voice metrics into session aggregate list
+                                if st.session_state.get("voice_metrics_dict"):
+                                    st.session_state.session_voice_metrics_list.append(
+                                        st.session_state.voice_metrics_dict
+                                    )
+
+                                # Synthesize TTS for assistant reply
+                                try:
+                                    tts_res = st.session_state.voice_engine.synthesize(
+                                        text=assistant_msg.content,
+                                        voice_id=persona.id if hasattr(persona, "id") else None,
+                                    )
+                                    if tts_res and tts_res.audio_bytes:
+                                        st.session_state.last_tts_audio = tts_res.audio_bytes
+                                    else:
+                                        st.session_state.last_tts_audio = None
+                                except Exception as tts_err:
+                                    st.session_state.last_tts_audio = None
+
+                                # Cleanly reset voice state for next turn
+                                reset_voice_state()
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error processing response: {e}")
 
         # Render Session Completion, Analysis & Evaluation
         elif session.is_completed():
@@ -645,6 +864,26 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                         persona=persona,
                     )
 
+                # Calculate aggregate session speech metrics if available
+                aggregate_speech_metrics = None
+                if st.session_state.get("session_voice_metrics_list"):
+                    v_list = st.session_state.session_voice_metrics_list
+                    total_dur = sum(m.get("recording_duration_seconds") or 0.0 for m in v_list)
+                    total_words = sum(m.get("word_count") or 0 for m in v_list)
+                    total_fillers = sum(m.get("filler_count") or 0 for m in v_list)
+                    avg_wpm = round(total_words / (total_dur / 60.0), 1) if total_dur >= 1.0 and total_words > 0 else None
+                    filler_pct = round(total_fillers / total_words * 100.0, 1) if total_words > 0 else 0.0
+                    aggregate_speech_metrics = {
+                        "recording_duration_seconds": round(total_dur, 2) if total_dur > 0 else None,
+                        "word_count": total_words,
+                        "words_per_minute": avg_wpm,
+                        "filler_count": total_fillers,
+                        "filler_percentage": filler_pct,
+                        "is_simulated": any(m.get("is_simulated", False) for m in v_list),
+                    }
+                elif st.session_state.get("voice_metrics_dict"):
+                    aggregate_speech_metrics = st.session_state.get("voice_metrics_dict")
+
                 # Persist completed session to persistent SQLite history (idempotent, once per session)
                 if st.session_state.get("saved_session_id") != session.session_id:
                     try:
@@ -654,6 +893,8 @@ def render_practice_page(scenario_mgr: ScenarioManager) -> None:
                             persona=persona,
                             evaluation=st.session_state.current_evaluation,
                             feedback=st.session_state.current_feedback,
+                            interaction_mode="voice" if st.session_state.get("interaction_mode") == "Voice" else "text",
+                            speech_metrics=aggregate_speech_metrics,
                         )
                         st.session_state.saved_session_id = session.session_id
                     except Exception as err:
@@ -1006,14 +1247,16 @@ def render_history_page() -> None:
 
     # Filter & Search Controls
     with st.expander("🔍 Filter & Sort History Records", expanded=False):
-        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns(5)
         with f_col1:
             mode_filter = st.selectbox("Practice Mode", ["All"] + PRACTICE_MODES, index=0)
         with f_col2:
             diff_filter = st.selectbox("Difficulty Tier", ["All"] + DIFFICULTY_LEVELS, index=0)
         with f_col3:
-            min_score = st.slider("Minimum Score", min_value=0, max_value=100, value=0, step=5)
+            inter_filter = st.selectbox("Interaction Mode", ["All", "text", "voice"], index=0)
         with f_col4:
+            min_score = st.slider("Minimum Score", min_value=0, max_value=100, value=0, step=5)
+        with f_col5:
             sort_order = st.selectbox(
                 "Sort By",
                 ["completed_at DESC", "completed_at ASC", "overall_score DESC", "overall_score ASC"],
@@ -1038,6 +1281,7 @@ def render_history_page() -> None:
     sessions = history_svc.list_sessions(
         mode=mode_filter if mode_filter != "All" else None,
         difficulty=diff_filter if diff_filter != "All" else None,
+        interaction_mode=inter_filter if inter_filter != "All" else None,
         start_date=start_date_iso,
         end_date=end_date_iso,
         min_score=float(min_score) if min_score > 0 else None,
@@ -1116,6 +1360,7 @@ def render_historical_session_detail(session_id: str) -> None:
     )
 
     # Historical Score Hero Card
+    inter_badge_str = f'<span class="mode-badge" style="background-color: #fef3c7; color: #92400e;">🎙️ {session.interaction_mode.capitalize()}</span>' if getattr(session, "interaction_mode", "text") == "voice" else '<span class="mode-badge">⌨️ Text</span>'
     st.markdown(
         f"""
         <div class="score-hero-card">
@@ -1123,14 +1368,31 @@ def render_historical_session_detail(session_id: str) -> None:
             <p style="font-size: 1.15rem; margin-top: 8px; font-weight: 600; color: #1e293b;">Historical Overall Performance Score</p>
             <span class="mode-badge">{session.mode}</span>
             <span class="diff-badge">{session.difficulty}</span>
+            {inter_badge_str}
             <div style="margin-top: 8px; color: #475569; font-size: 0.9rem;">
-                Turns: <strong>{session.turn_count}</strong> • Duration: <strong>{session.formatted_duration}</strong>
+                Turns: <strong>{session.turn_count}</strong> • Duration: <strong>{session.formatted_duration}</strong> • Mode: <strong>{getattr(session, "interaction_mode", "text").capitalize()}</strong>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
     st.progress(min(1.0, max(0.0, session.overall_score / 100.0)))
+
+    # Factual Speech Delivery Metrics (if recorded)
+    if session.speech_metrics and isinstance(session.speech_metrics, dict):
+        st.markdown("### 🎙️ Recorded Speech Delivery Metrics")
+        sm_c1, sm_c2, sm_c3, sm_c4 = st.columns(4)
+        with sm_c1:
+            dur_val = session.speech_metrics.get("recording_duration_seconds")
+            st.metric("Speech Duration", f"{dur_val:.1f}s" if dur_val is not None else "N/A")
+        with sm_c2:
+            st.metric("Words Spoken", session.speech_metrics.get("word_count", "N/A"))
+        with sm_c3:
+            wpm_val = session.speech_metrics.get("words_per_minute")
+            st.metric("Speaking Pace", f"{wpm_val:.1f} WPM" if wpm_val is not None else "N/A")
+        with sm_c4:
+            st.metric("Vocal Fillers", session.speech_metrics.get("filler_count", 0))
+        st.caption("ℹ️ Objective speech metrics measure technical delivery and pace; strictly not psychological assessments.")
 
     tab_eval, tab_feed, tab_transcript = st.tabs([
         "🏆 Evaluation Breakdown (Phase 5)",
@@ -1353,6 +1615,22 @@ def render_analytics_page() -> None:
         st.metric("Average Turns", f"{summary['average_turns']:.1f}")
 
     st.markdown("---")
+
+    # Voice Interaction & Speech Intelligence Statistics (Phase 8)
+    voice_stats = analytics_svc.get_voice_analytics(sessions)
+    if voice_stats.get("has_voice_data"):
+        st.markdown("### 🎙️ Speech Intelligence & Voice Delivery Metrics")
+        st.caption("Factual, observable speech measurements across voice sessions. Strictly technical indicators; not psychological assessments.")
+        v_col1, v_col2, v_col3, v_col4 = st.columns(4)
+        with v_col1:
+            st.metric("Voice Sessions", f"{voice_stats['voice_session_count']} ({voice_stats['voice_usage_percentage']}%)")
+        with v_col2:
+            st.metric("Avg Speaking Pace", f"{voice_stats['average_wpm']:.1f} WPM")
+        with v_col3:
+            st.metric("Avg Speech Duration", f"{voice_stats['average_voice_duration_seconds']:.1f}s")
+        with v_col4:
+            st.metric("Avg Fillers / Session", f"{voice_stats['avg_filler_count_per_session']:.1f}")
+        st.markdown("---")
 
     # Longitudinal Progress Trend
     st.markdown("### 📈 Chronological Score Progression")

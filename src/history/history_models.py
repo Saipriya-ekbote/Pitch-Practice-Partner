@@ -282,6 +282,9 @@ class HistoricalSession:
     max_score: float = 100.0
     duration_seconds: Optional[float] = None
     evaluation_status: str = "completed"
+    interaction_mode: str = "text"
+    speech_metrics: Optional[Dict[str, Any]] = None
+    raw_speech_metrics_json: Optional[str] = None
     messages: List[HistoricalMessage] = field(default_factory=list)
     dimensions: List[HistoricalDimensionScore] = field(default_factory=list)
     evaluation: Optional[EvaluationResult] = None
@@ -341,6 +344,8 @@ class HistoricalSession:
             "overall_score": round(self.overall_score, 1),
             "max_score": self.max_score,
             "evaluation_status": self.evaluation_status,
+            "interaction_mode": self.interaction_mode,
+            "speech_metrics": self.speech_metrics,
             "messages": [m.to_dict() for m in self.messages],
             "dimensions": [d.to_dict() for d in self.dimensions],
             "evaluation": evaluation_to_dict(self.evaluation),
@@ -378,6 +383,8 @@ class HistoricalSession:
             max_score=float(data.get("max_score", 100.0)),
             duration_seconds=data.get("duration_seconds"),
             evaluation_status=str(data.get("evaluation_status", "completed")),
+            interaction_mode=str(data.get("interaction_mode", "text")),
+            speech_metrics=data.get("speech_metrics"),
             messages=messages,
             dimensions=dimensions,
             evaluation=eval_obj,

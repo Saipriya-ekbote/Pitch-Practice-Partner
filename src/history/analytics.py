@@ -262,6 +262,96 @@ class AnalyticsService:
             )
         return results
 
+    def get_voice_analytics(
+        self, sessions: Optional[List[HistoricalSession]] = None
+    ) -> Dict[str, Any]:
+        """
+        Compute objective, descriptive voice interaction metrics.
+        Strictly descriptive: no ranking, no psychological inferences.
+        """
+        if sessions is None:
+            sessions = self.get_sessions()
+
+        if not sessions:
+            return {
+                "total_sessions": 0,
+                "voice_session_count": 0,
+                "text_session_count": 0,
+                "voice_usage_percentage": 0.0,
+                "average_voice_duration_seconds": 0.0,
+                "average_wpm": 0.0,
+                "avg_speech_duration": 0.0,
+                "avg_speaking_pace_wpm": 0.0,
+                "avg_filler_count_per_session": 0.0,
+                "total_voice_words": 0,
+                "has_voice_data": False,
+            }
+
+        total_sessions = len(sessions)
+        voice_sessions = [s for s in sessions if getattr(s, "interaction_mode", "text") == "voice"]
+        text_sessions = [s for s in sessions if getattr(s, "interaction_mode", "text") != "voice"]
+
+        voice_count = len(voice_sessions)
+        text_count = len(text_sessions)
+        voice_pct = round((voice_count / total_sessions) * 100.0, 1) if total_sessions > 0 else 0.0
+
+        if not voice_sessions:
+            return {
+                "total_sessions": total_sessions,
+                "voice_session_count": 0,
+                "text_session_count": text_count,
+                "voice_usage_percentage": 0.0,
+                "average_voice_duration_seconds": 0.0,
+                "average_wpm": 0.0,
+                "avg_speech_duration": 0.0,
+                "avg_speaking_pace_wpm": 0.0,
+                "avg_filler_count_per_session": 0.0,
+                "total_voice_words": 0,
+                "has_voice_data": False,
+            }
+
+        durations: List[float] = []
+        wpms: List[float] = []
+        fillers: List[int] = []
+        words: List[int] = []
+
+        for vs in voice_sessions:
+            sm = vs.speech_metrics
+            if isinstance(sm, dict):
+                dur = sm.get("recording_duration_seconds")
+                if dur is not None and dur > 0:
+                    durations.append(float(dur))
+                wpm = sm.get("words_per_minute")
+                if wpm is not None and wpm > 0:
+                    wpms.append(float(wpm))
+                fc = sm.get("filler_count")
+                if fc is not None:
+                    fillers.append(int(fc))
+                wc = sm.get("word_count")
+                if wc is not None:
+                    words.append(int(wc))
+            elif vs.duration_seconds is not None and vs.duration_seconds > 0:
+                durations.append(float(vs.duration_seconds))
+
+        avg_dur = round(sum(durations) / len(durations), 1) if durations else 0.0
+        avg_wpm = round(sum(wpms) / len(wpms), 1) if wpms else 0.0
+        avg_fillers = round(sum(fillers) / len(fillers), 1) if fillers else 0.0
+        total_words = sum(words)
+
+        return {
+            "total_sessions": total_sessions,
+            "voice_session_count": voice_count,
+            "text_session_count": text_count,
+            "voice_usage_percentage": voice_pct,
+            "average_voice_duration_seconds": avg_dur,
+            "average_wpm": avg_wpm,
+            "avg_speech_duration": avg_dur,
+            "avg_speaking_pace_wpm": avg_wpm,
+            "avg_filler_count_per_session": avg_fillers,
+            "total_voice_words": total_words,
+            "has_voice_data": True,
+        }
+
 
 def compare_sessions(
     session_a: HistoricalSession,
@@ -270,7 +360,7 @@ def compare_sessions(
     """
     Compare two historical sessions side-by-side using neutral, descriptive language.
     Strictly avoids value judgments (no 'Session A was superior').
-    
+
     Returns:
         Dict containing metadata comparison, score differences, dimensional comparisons,
         and common/distinct strengths and improvements.

@@ -56,6 +56,8 @@ class HistoryService:
         evaluation: Optional[EvaluationResult] = None,
         feedback: Optional[FeedbackResult] = None,
         force_update: bool = False,
+        interaction_mode: Optional[str] = None,
+        speech_metrics: Optional[Dict[str, Any]] = None,
     ) -> HistoricalSession:
         """
         Validate and save a completed practice session to permanent history.
@@ -65,6 +67,7 @@ class HistoryService:
         - Prevents duplicate inserts for the same session_id (idempotent).
         - Preserves conversation transcript with role, content, order, and timestamps.
         - Preserves Phase 5 scores and Phase 6 feedback intact.
+        - Preserves Phase 8 interaction_mode and speech_metrics.
         """
         # Completion validation
         if not session.is_completed() and session.turn_number == 0:
@@ -116,6 +119,9 @@ class HistoryService:
         pers_name = persona.name if persona else "Interviewer"
         mode_val = scenario.mode if scenario else session.mode
 
+        inter_mode = interaction_mode or getattr(session, "interaction_mode", "text") or "text"
+        sp_metrics = speech_metrics if speech_metrics is not None else getattr(session, "speech_metrics", None)
+
         historical_session = HistoricalSession(
             session_id=session.session_id,
             created_at=session.started_at,
@@ -131,6 +137,8 @@ class HistoryService:
             max_score=max_score,
             duration_seconds=duration_sec,
             evaluation_status="completed",
+            interaction_mode=inter_mode,
+            speech_metrics=sp_metrics,
             messages=historical_messages,
             dimensions=historical_dimensions,
             evaluation=evaluation,
@@ -156,6 +164,7 @@ class HistoryService:
         end_date: Optional[str] = None,
         min_score: Optional[float] = None,
         max_score: Optional[float] = None,
+        interaction_mode: Optional[str] = None,
         order_by: str = "completed_at DESC",
     ) -> List[HistoricalSession]:
         """List sessions with optional filters."""
@@ -167,6 +176,7 @@ class HistoryService:
             end_date=end_date,
             min_score=min_score,
             max_score=max_score,
+            interaction_mode=interaction_mode,
             order_by=order_by,
         )
 
